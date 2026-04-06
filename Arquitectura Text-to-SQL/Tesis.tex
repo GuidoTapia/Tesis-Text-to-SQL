@@ -1,0 +1,79 @@
+% Template LaTeX Tesis Ciencia de la Computación UCSP
+% 2022
+
+\documentclass[a4paper,openany,12pt]{book}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage[spanish,mexico]{babel}
+\usepackage{sty/fancyhdr}
+\usepackage{ae}
+\usepackage[left=2.5cm,right=2.5cm,top=3cm,bottom=2cm]{geometry}
+\usepackage[printonlyused]{acronym}
+\usepackage{xspace}
+\usepackage{sty/hlundef}
+\usepackage{sty/tesis}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{}
+
+\title{** Título de la Tesis **}
+\title{Arquitectura de razonamiento estructural basada en representación intermedia para la mitigación de alucinaciones en la generación de consultas empresariales sobre el estándar híbrido SQL/PGQ}
+
+\author{Guido Luis Tapia Oré}
+
+
+\advisor{Dra. Regina Paola Ticona Herrera}
+
+
+\date{** Arequipa, Julio 2026 **}
+
+%\examinerone{Prof. Dr. Hidalgo Buena Gente}{Presidente}%
+%\examinertwo{Prof. Dr. Antero A. Gal Oppe}{Secretario}%
+%\examinerthree{Prof. Dr. Liu Xiao Ling}{University of ...} % of being the case
+
+\dedicado{A mi familia por su incondicional apoyo en este proceso, a los profesores que fueron una guía en este proceso de investigación, a mis compañeros que ayudaron a no rendirme en este proceso.}
+
+\begin{document}
+\pagestyle{fancy}
+
+\maketitle %Compone la carátula y la dedicatoria
+\newpage
+
+%\approved{\tres}%  {\tres} or {\cuatro}
+
+\include{abreviaturas}
+
+\input{Agradecimientos} %Inserta los agradecimientos
+\input{Resumen} %Inserta el resumen
+\input{Abstract} %Inserta el abstract
+
+\pagenumbering{roman}
+\setcounter{page}{1}
+\pagestyle{plain}
+
+\tableofcontents %Inserta el índice general
+\listoftables %Inserta el índice de cuadros
+\listoffigures %Inserta el índice de figuras
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%   En esta parte deberas incluir los archivos de tu tesis   %%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pagestyle{plain}
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\input{Cap_1_Introduccion} %Inserta el capítulo 1
+\input{Cap_2_MarcoTeorico} %Inserta el capítulo 2
+\input{Cap_3_EstadoArte} %Inserta el capítulo 3
+\input{Cap_4_Propuesta} %Inserta el capítulo 4
+\input{Cap_5_Experimentos} %Inserta el capítulo 4
+\input{Cap_6_Resultados} %Inserta el capítulo 4
+\input{conclusiones} %Inserta el capítulo 5
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\bibliographystyle{apalike}
+
+\bibliography{Bibliog}
+\addcontentsline{toc}{chapter}{Bibliografía}
+\end{document}
