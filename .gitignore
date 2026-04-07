@@ -18,6 +18,8 @@
 # Uncomment to ignore PDFs:
 # *.pdf
 
+*CLAUDE.md
+
 # Editor files
 .DS_Store
 *.swp

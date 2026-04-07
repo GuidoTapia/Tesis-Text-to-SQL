@@ -1,7 +1,7 @@
 \chapter{Introducción}
 \label{chap:introduction}
 
-Este capítulo busca establecer el contexto, la motivación y el problema de investigación que abordará la presente tesis, de la cual el enfoque central radica en el diseño de una arquitectura de razonamiento estructural, basada en \ac{RI}, para mitigar las alucinaciones en la generación \emph{text-to-query} de consultas empresariales complejas, especificamente orientado al estándar híbrido \ac{SQL}/\ac{PGQ}.
+Este capítulo busca establecer el contexto, la motivación y el problema de investigación que abordará la presente tesis, de la cual el enfoque central radica en el diseño de una arquitectura de razonamiento estructural, basada en \ac{RI}, para mitigar las alucinaciones en la generación \emph{text-to-query} de consultas empresariales complejas, específicamente orientado al estándar híbrido \ac{SQL}/\ac{PGQ}.
 
 Esta investigación se sitúa en la intersección entre los \acp{LLM}, los sistemas de gestión de bases de datos relacionales (\acp{RDBMS}) y los lenguajes de consulta híbridos, siendo que estos lenguajes combinan el paradigma relacional tradicional con las consultas sobre grafos de propiedades (\emph{property graphs}), un modelo que ha sido recientemente formalizado en estándares internacionales como ISO/IEC \cite{ISO9075_16_2023}.
 
@@ -62,7 +62,7 @@ El restante de este documento de tesis está organizado de la siguiente forma:
 \begin{itemize}
 	\item El capítulo~\ref{chap:background} describe el marco teórico, para un mejor entendimiento del alcance de \acp{LLM} y alucinaciones, fundamentos de \emph{text-to-SQL}, bases de \ac{SQL}/\ac{PGQ}, y técnicas de \ac{RI}, decodificación restringida y verificación.
 	\item El capítulo~\ref{chap:stateoftheart} revisa el estado del arte en arquitecturas \emph{text-to-query} (pipelines por etapas, agentes, \emph{constrained decoding}, detección/mitigación de alucinaciones) y posiciona el problema en el contexto empresarial y del estándar híbrido.
-	\item El capítulo~\ref{chap:proposal} describe la propuesta: la \ac{RI} tipada para \ac{SQL}/\ac{PGQ}, el compilador \ac{RI}$\rightarrow$\ac{SQL}/\ac{PGQ}, el pipeline de razonamiento estructural y el bucle de verificación (estático y por ejecución).
+	\item El capítulo~\ref{chap:proposal} describe la propuesta: la \ac{RI} tipada para \ac{SQL}/\ac{PGQ}, el compilador \ac{RI} $\rightarrow$ \ac{SQL}/\ac{PGQ}, el pipeline de razonamiento estructural y el bucle de verificación (estático y por ejecución).
 	\item El capítulo~\ref{chap:experiments} detalla el diseño experimental: datasets/benchmarks, construcción de corpus híbrido para \ac{SQL}/\ac{PGQ}, métricas de alucinación y corrección, baselines y \emph{ablations}.
 	\item El capítulo~\ref{chap:results} presenta y analiza los resultados obtenidos, incluyendo robustez a \emph{schema drift}, seguridad/eficiencia, y evaluación de componentes, validando los resultados con datasets relevantes.
 	\item El capítulo~\ref{chap:conclusions} concluye la tesis, resume aportes, limitaciones y líneas de trabajo futuro.
@@ -71,5 +71,4 @@ El restante de este documento de tesis está organizado de la siguiente forma:
 
 
 \section{Cronograma}
-% Solo para plan de tesis o propuesta de tesis, no en versión final
-Esta sección sólo es para aquellos alumnos que estén presentando su plan de tesis. Esta sección no va en la tesis final.
+\input{cronograma}
