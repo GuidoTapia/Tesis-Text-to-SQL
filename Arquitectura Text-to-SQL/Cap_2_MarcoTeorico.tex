@@ -1,69 +1,27 @@
 \chapter{Marco Teórico}\label{chap:background}
 
-Cada capítulo deberá contener una breve introducción que describe en forma rápida el contenido del
-mismo. En este capítulo va el marco teórico. (pueden ser dos capítulos de marco teórico)
+Este capítulo revisa los conceptos y tecnologías relevantes para la presente investigación, organizados de lo general a lo específico. Primero se presentan los \acp{LLM}, su arquitectura fundamental y el problema de las alucinaciones en la generación de consultas. Luego se estudian las representaciones intermedias y gramáticas formales aplicadas a text-to-query (\emph{text-to-SQL/PGQ}). A continuación se aborda la decodificación restringida y técnicas de verificación, y finalmente se contextualiza la investigación en consultas híbridas bajo los estándares recientes de grafos en bases de datos.
 
-\section{Sección 1 del Capítulo II}
+\section{Modelos de Lenguaje y Alucinaciones}
 
-Un capítulo puede contener $n$ secciones. 
+Los \acp{LLM} se basan en la arquitectura \emph{transformer}, caracterizada por mecanismos de atención multi-cabeza que capturan dependencias de largo alcance entre tokens de la entrada. Al estar entrenados en grandes corpus de texto, han demostrado capacidad notable para tareas de \emph{text-to-query}. Sin embargo, su objetivo de predicción de tokens sin supervisión explícita de semántica contribuye a las \emph{alucinaciones}: generación de información no sustentada en los datos de entrada. En text-to-SQL, esto se traduce en problemas como referenciar columnas inexistentes, asumir relaciones falsas entre tablas o generar condiciones lógicamente inconsistentes \cite{errorllm2026}. Las causas reconocidas incluyen ambigüedad en la pregunta del usuario, desajuste entre la distribución del texto libre y la de las consultas formales, y la ausencia de validación semántica durante el entrenamiento. Se han propuesto taxonomías de errores en text-to-SQL ---incluyendo omisión de columnas, condiciones malformadas y joins incorrectos--- que permiten sistematizar los tipos de alucinación. Comprender estas causas motiva integrar verificaciones adicionales en la arquitectura para evitar que se ejecuten consultas erróneas.
 
-Con respecto a las referencias bibliográficas, se hace de la siguiente manera \cite{Mateos00}, se debe de redactar el texto de forma tal que si se retiraran las referencias, la redacción no debe perjudicarse. Por ejemplo 
+\section{Representaciones Intermedias para Consultas}
 
-\subsubsection{Localización y Mapeo Simultaneos SLAM puramente topológico}
-Se puede hacer un sistema SLAM con sólo reconocimiento de lugares, generando un SLAM topológico con representación basada en grafos \cite{Choset_2001}. Se almacena un registro de lugares visitados y cómo se llega de uno a otro (conexiones) sin tener información geométrica explícita.
+Una estrategia para mejorar la generación es descomponer el problema usando una \emph{representación intermedia} (RI). Obras como IRNet demuestran que mapear el texto natural a un RI estructurado y luego compilarlo a SQL mejora la fidelidad. IRNet introduce SemQL, un lenguaje específico a ese trabajo que separa la interpretación semántica (selección, proyección, condición) de la sintaxis concreta de cada base de datos; debe entenderse como una instancia particular de este enfoque, no como un estándar generalizado. De forma similar, GraphixT5 \cite{Graphix-T52022} incorpora grafos del esquema de base de datos como estructura auxiliar para mejorar el enlace entre entidades del texto y columnas de las tablas. Estas representaciones permiten aplicar chequeos de consistencia estructural: solo son válidas transiciones que respetan las relaciones definidas en el esquema (por ejemplo, no proyectar una columna sin incluir la tabla correspondiente en el \texttt{FROM}), lo que reduce alucinaciones de estructura. Además, un RI estandarizado facilita extender la generación para incluir elementos adicionales, como nodos y aristas de un grafo de propiedad.
 
-Este tipo de SLAM es más adecuado para planificación y navegación. La figura \ref{Fig:SLAMTopological} ilustra este tipo de SLAM 
-	
-	\begin{figure}[ht]
-		\centering
-			\includegraphics[width = 6cm]{figs/Chap2/SLAM-TopologicalRepresentation.jpg}
-			\label{Fig:SLAMTopological}
-			\caption{SLAM puramente topológico basado en grafos}
-	\end{figure}
+\section{Decodificación Restringida y Gramáticas Formales}
 
+El uso de una RI está íntimamente ligado a métodos de decodificación restringida: limitar los tokens que el modelo puede generar según una gramática o sintaxis permitida \cite{PICARD2022}. Por ejemplo, PICARD \cite{PICARD2022} integra una gramática SQL para descartar candidatos inválidos en tiempo real. Esto garantiza que la salida sea sintácticamente correcta aunque el modelo tenga incertidumbre. Otros enfoques como SmBoP \cite{SmBoP2021} generan la consulta construyéndola desde componentes, usando un enfoque \emph{bottom-up} que impone estructura desde el inicio. Estas técnicas reducen considerablemente los errores sintácticos, dejando pendientes principalmente las inconsistencias semánticas. En consultas híbridas, la gramática debe extenderse para cubrir también las cláusulas de grafos definidas en el estándar SQL/PGQ (p. ej., \texttt{MATCH} con sub-cláusulas de patrón, condición y proyección de columnas). El estudio formal de la expresividad de estos lenguajes aporta los cimientos para definir la gramática restringida adecuada.
 
-\subsection{Sub Sección}
+\section{Verificación y Autocorrección}
 
-Una sección puede contener $n$ sub secciones.\cite{Galante01}
+Para abordar alucinaciones semánticas se han explorado mecanismos de verificación. Una vía es la verificación estática: comprobar propiedades del RI generado antes de pasarlo a SQL. Por ejemplo, asegurarse de que todas las columnas referenciadas existen en el esquema real y que las condiciones de join son consistentes con las claves foráneas \cite{RAT-SQL2021}. Otra vía es la verificación dinámica o por ejecución: usar el propio \ac{RDBMS} como oráculo parcial, ejecutando la consulta en un entorno controlado y analizando resultados atípicos (valores nulos inesperados, cardinalidad cero) como señales de error \cite{SQLHD2025}. También se han explorado relaciones metamórficas ---ejecutar variantes de la consulta y verificar coherencia entre los resultados--- como mecanismo de detección de inconsistencias semánticas \cite{WrenAI2025}. Asimismo, frameworks de autocorrección iterativa usan el modelo para reintentar variaciones guiadas por feedback del resultado obtenido. Estas técnicas de verificación y refinamiento en un loop iterativo complementan la generación restringida, mejorando la solidez del sistema.
 
-\subsubsection{Sub sub sección}
+\section{Consultas Híbridas SQL/PGQ y Estándares Emergentes}
 
-Una sub sección puede contener n sub sub secciones.
+Un \emph{grafo de propiedad} es una estructura que organiza los datos como nodos (entidades) y aristas (relaciones) dirigidas, donde tanto nodos como aristas pueden tener asociado un conjunto de propiedades clave-valor. El estándar ISO/IEC 9075-16:2023 (SQL/PGQ) formaliza la integración de este modelo con SQL relacional, permitiendo definir grafos sobre tablas existentes y consultar patrones de caminos o vecindades dentro del mismo entorno SQL \cite{ISO9075_16_2023}. Este contexto híbrido es nuevo en text-to-query y requiere modelar simultáneamente dos esquemas: las tablas relacionales y el grafo de propiedad superpuesto. Investigaciones como PG-Schema y PGQL sientan las bases formales de cómo estructurar y consultar estos datos. Algunas herramientas experimentales (p. ej., DuckPGQ) muestran que es posible compilar patrones de grafo a SQL puro, pero la generación automática de consultas híbridas a partir de lenguaje natural carece aún de sistemas maduros publicados, lo que constituye una de las motivaciones principales de esta investigación.
 
-\section{Recomendaciones generales de escritura}
-Un trabajo de esta naturaleza debe tener en consideración varios aspectos generales:
+\section{Resumen y Conexiones}
 
-\begin{itemize}
-\item Ir de lo genérico a lo específico. Siempre hay qeu considerar que el lector podría ser alguien no muy familiar con el tema 
-y la lectura debe serle atractiva.
-\item No redactar frases muy largas. Si las frases tienen más de 2 líneas continuas es probable que la lectura sea dificultosa.
-\item Las figuras, ecuaciones, tablas deben ser citados y explicados {\bf antes} de que aparezcan en el documento, como la Tabla \ref{tab:OSProcesses} que se presenta a continuación.
-
-\begin{table}[ht]
-	\centering
-	{\footnotesize
-    \begin{tabular}{p{0.20\textwidth}@{\;}p{0.65\textwidth}}
-		\toprule
-    \multicolumn{1}{c}{\bf Motivo} & \multicolumn{1}{c}{\bf Explicación} \\
-    \midrule
-    {\bf \textit{Swaping}} & El SO requiere liberar memoria principal para cederla a un proceso listo para ejecución. \\
-{\bf Otras razones SO} & El SO puede suspender un proceso en segundo plano o una utilidad o un proceso que parece causar problemas. \\
-{\bf Pedido del usuario} &  Un usuario puede solicitar suspensión por {\it debugging} o espera de conexión para uso de un recurso. \\
-{\bf Temporización} &  Un proceso que se ejecuta periódicamente que puede esperar su proxima temporización en modo suspendido. \\
-{\bf A pedido del proceso padre} &  Un proceso padre puede suspender la ejecución de sus procesos hijos para analizarlos o gestionarlos.\\
-\bottomrule
-\end{tabular}
-}
-	\caption{Ejemplo de tabla Procesos en Sistemas Operativos}
-	\label{tab:OSProcesses}
-\end{table}
-
-
-\item Encadenar las ideas. Ninguna frase debe estar suelta. Siempre que terminas un párrafo y hay otro a continuación, 
-el primero debe dejar abierta la idea que se explicará a continuación. Todo debe tener secuencia.
-\end{itemize}
-
-
-\section{Consideraciones Finales}
-
-Cada capítulo excepto el primero debe contener, al finalizar, una sección de consideraciones que enlacen el presente capítulo con el siguiente.
+Los fundamentos revisados en este capítulo permiten identificar un vacío concreto: si bien existen técnicas consolidadas para generación restringida y verificación en text-to-SQL puro, y existen estándares formales para consultas híbridas SQL/PGQ, ningún trabajo publicado integra ambos dominios de forma sistemática. Las técnicas de RI y decodificación restringida requieren ser extendidas para acomodar la semántica de grafos de propiedad, y los mecanismos de verificación deben operar sobre esquemas duales (relacional y de grafo). El siguiente capítulo revisa el estado del arte en sistemas text-to-query avanzados, analizando cómo cada enfoque aborda parcialmente estos desafíos y qué componentes restan por integrar.
