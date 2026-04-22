@@ -18,8 +18,13 @@
 # Uncomment to ignore PDFs:
 # *.pdf
 
+# Claude Code artifacts
 *CLAUDE.md
+.claude/
+.claude.json
+
 COMMIT_STYLE.md
+TESIS_STRUCTURE.md
 
 tesis-ejemplo
 
