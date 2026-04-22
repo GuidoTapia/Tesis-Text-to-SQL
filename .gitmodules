@@ -1,0 +1,9 @@
+[submodule "Implementaciones/baselines/xiyan_sql"]
+	path = Implementaciones/baselines/xiyan_sql
+	url = https://github.com/XGenerationLab/XiYan-SQL.git
+[submodule "Implementaciones/baselines/chess"]
+	path = Implementaciones/baselines/chess
+	url = https://github.com/ShayanTalaei/CHESS.git
+[submodule "Implementaciones/corpus/cypherbench_src"]
+	path = Implementaciones/corpus/cypherbench_src
+	url = https://github.com/megagonlabs/cypherbench.git
