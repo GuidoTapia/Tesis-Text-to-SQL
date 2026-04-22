@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.env
+
+# uv
+.uv_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Datos pesados (no commitear)
+corpus/spider_bird/database/
+corpus/spider_bird/*.sqlite
+corpus/spider_bird/*.json
+corpus/spider_bird/*.sql
+corpus/pgq_synthetic/*.duckdb
+corpus/pgq_synthetic/*.parquet
+*.parquet
+
+# Resultados experimentales
+evaluation/runs/
+*.log
+
+# IDE
+.idea/
+
+# OS
+.DS_Store

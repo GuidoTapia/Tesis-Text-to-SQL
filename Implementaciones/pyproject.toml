@@ -1,0 +1,28 @@
+[project]
+name = "tesis-sqlpgq"
+version = "0.0.0"
+description = "Implementación experimental de la tesis: Text-to-SQL/PGQ con IR unificada y verificación estructurada"
+requires-python = ">=3.11,<3.12"
+authors = [
+    { name = "Guido Tapia", email = "guido.tapia@designli.co" }
+]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+
+dependencies = [
+    "duckdb>=1.4.1,<1.5",
+    "sqlglot>=25.0",
+    "ipython>=8.0",
+    "pytest>=8.0",
+    "jupyter>=1.0",
+    "nl2sql360",
+    "nltk",     # dep no declarada por nl2sql360 — requerida por evaluator/test_suite_sql_eval
+    "sqlparse", # idem — requerida por evaluator/test_suite_sql_eval/parse.py
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
