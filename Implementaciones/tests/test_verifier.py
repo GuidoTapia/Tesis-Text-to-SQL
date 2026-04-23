@@ -22,3 +22,11 @@ def test_unknown_column() -> None:
     sql = "SELECT age FROM singer"
     errors = verify_sql(sql, SCHEMA)
     assert any("age" in e for e in errors)
+
+
+def test_select_alias_not_flagged() -> None:
+    sql = (
+        "SELECT name, COUNT(*) as song_count "
+        "FROM singer GROUP BY name ORDER BY song_count DESC"
+    )
+    assert verify_sql(sql, SCHEMA) == []

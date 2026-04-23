@@ -53,6 +53,11 @@ def verify_sql(sql: str, schema: Schema, dialect: str = "duckdb") -> list[str]:
     errors: list[str] = []
     schema_tables = {_normalize(t) for t in schema}
     schema_columns = _all_columns(schema)
+    query_aliases = {
+        _normalize(a.alias)
+        for a in parsed.find_all(exp.Alias)
+        if a.alias
+    }
 
     referenced_tables: Iterable[str] = (
         _normalize(t.name) for t in parsed.find_all(exp.Table) if t.name
@@ -65,7 +70,9 @@ def verify_sql(sql: str, schema: Schema, dialect: str = "duckdb") -> list[str]:
         name = col.name
         if not name or name == "*":
             continue
-        if _normalize(name) not in schema_columns:
-            errors.append(f"unknown_column: {name}")
+        n = _normalize(name)
+        if n in schema_columns or n in query_aliases:
+            continue
+        errors.append(f"unknown_column: {name}")
 
     return errors
