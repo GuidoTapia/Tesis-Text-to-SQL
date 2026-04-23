@@ -14,12 +14,11 @@ venv/
 .ipynb_checkpoints/
 
 # Datos pesados (no commitear)
-corpus/spider_bird/database/
-corpus/spider_bird/*.sqlite
-corpus/spider_bird/*.json
-corpus/spider_bird/*.sql
-corpus/pgq_synthetic/*.duckdb
-corpus/pgq_synthetic/*.parquet
+# Spider/BIRD: ignorar todos los artefactos salvo el .gitkeep de la carpeta
+corpus/spider_bird/*
+!corpus/spider_bird/.gitkeep
+corpus/pgq_synthetic/*
+!corpus/pgq_synthetic/.gitkeep
 *.parquet
 
 # Resultados experimentales

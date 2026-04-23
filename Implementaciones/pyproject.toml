@@ -18,6 +18,8 @@ dependencies = [
     "nl2sql360",
     "nltk",     # dep no declarada por nl2sql360 — requerida por evaluator/test_suite_sql_eval
     "sqlparse", # idem — requerida por evaluator/test_suite_sql_eval/parse.py
+    "anthropic>=0.40",
+    "python-dotenv>=1.0",
 ]
 
 [tool.uv]
