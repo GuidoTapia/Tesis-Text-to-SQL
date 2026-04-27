@@ -19,7 +19,7 @@
   title={STRuCT-LLM: Unifying Tabular and Graph Reasoning with Reinforcement Learning for Semantic Parsing},
   author={Stoisser, Josefa Lia and Martell, Marc Boubnovski and Phillips, Lawrence and Hansen, Casper and Fauqueur, Julien},
   journal={ICLR 2025},
-  year={2026},
+  year={2025},
   url={https://openreview.net/forum?id=xZDoGrMTGI}
 }
 @article{OpenSearch-SQL2025,
@@ -289,7 +289,7 @@ Semantic Parsing: Two Simple Semantic Boundary-Based Techniques},
   year={2023},
   url={https://doi.org/10.14778/3583140.3583165}
 }
-@article{G³R2023,
+@article{G3R2023,
   title={G3R: A Graph-Guided Generate-and-Rerank Framework for Complex and Cross-domain Text-to-SQL Generation},
   author={Y. Xiang, Q.-W. Zhang, X. Zhang, and et al.},
   journal={ACL 2023 Findings},
@@ -418,12 +418,38 @@ ses reranking for text-to-sql systems},
       url={https://arxiv.org/abs/2508.15276}, 
 }
 
-@inproceedings{li2023bird,
-  title={BIRD: Bird's-Eye-View Iterative Refinement and Detection for 3D Object Detection},
-  author={Li, Yuan-Chen and Ge, Zihao and Hu, Jun-Jie and Chen, Jiachen and Zhang, Shuyun and Yuan, Zelun and Sun, Jian},
-  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  pages={13324--13333},
-  year={2023}
+@inproceedings{BIRD2023,
+  title={Can {LLM} Already Serve as A Database Interface? A {BIg} Bench for Large-Scale Database Grounded Text-to-{SQLs}},
+  author={Li, Jinyang and Hui, Binyuan and Qu, Ge and Yang, Jiaxi and Li, Binhua and Li, Bowen and Wang, Bailin and Qin, Bowen and Geng, Ruiying and Huo, Nan and Zhou, Xuanhe and Ma, Chenhao and Li, Guoliang and Chang, Kevin C.-C. and Huang, Fei and Cheng, Reynold and Li, Yongbin},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2023},
+  url={https://arxiv.org/abs/2305.03111}
+}
+
+@inproceedings{Spider2018,
+  title={Spider: A Large-Scale Human-Labeled Dataset for Complex and Cross-Domain Semantic Parsing and Text-to-{SQL} Task},
+  author={Yu, Tao and Zhang, Rui and Yang, Kai and Yasunaga, Michihiro and Wang, Dongxu and Li, Zifan and Ma, James and Li, Irene and Yao, Qingning and Roman, Shanelle and Zhang, Zilin and Radev, Dragomir},
+  booktitle={Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year={2018},
+  url={https://arxiv.org/abs/1809.08887}
+}
+
+@inproceedings{NatSQL2021,
+  title={Natural {SQL}: Making {SQL} Easier to Infer from Natural Language Specifications},
+  author={Gan, Yujian and Chen, Xinyun and Xie, Jinxia and Purver, Matthew and Woodward, John R. and Drake, John and Zhang, Qiaofu},
+  booktitle={Findings of the Association for Computational Linguistics: EMNLP 2021},
+  year={2021},
+  url={https://arxiv.org/abs/2109.05153}
+}
+
+@misc{CypherBench2024,
+  title={{CypherBench}: Towards Precise Retrieval over Full-scale Modern Knowledge Graphs in the {LLM} Era},
+  author={Feng, Yanlin and Pratapa, Adithya and Mortensen, David R.},
+  year={2024},
+  eprint={2412.18702},
+  archivePrefix={arXiv},
+  primaryClass={cs.CL},
+  url={https://arxiv.org/abs/2412.18702}
 }
 
 @inproceedings{spider2_2025,
@@ -529,12 +555,142 @@ journal = {Journal of Artificial Intelligence}
       url={https://arxiv.org/abs/2301.09043}, 
 }
 
+@misc{IRNet,
+      title={Towards Complex Text-to-SQL in Cross-Domain Database with Intermediate Representation},
+      author={Jiaqi Guo and Zecheng Zhan and Yan Gao and Yan Xiao and Jian-Guang Lou and Ting Liu and Dongmei Zhang},
+      year={2019},
+      eprint={1905.08205},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/1905.08205},
+}
+
+@article{DuckPGQ,
+  author = {Wolde, Daniel ten and Sz\'{a}rnyas, G\'{a}bor and Boncz, Peter},
+  title = {DuckPGQ: Bringing SQL/PGQ to DuckDB},
+  year = {2023},
+  issue_date = {August 2023},
+  publisher = {VLDB Endowment},
+  volume = {16},
+  number = {12},
+  issn = {2150-8097},
+  url = {https://doi.org/10.14778/3611540.3611614},
+  doi = {10.14778/3611540.3611614},
+  journal = {Proc. VLDB Endow.},
+  month = aug,
+  pages = {4034--4037},
+  numpages = {4}
+}
+
 @misc{text2gqlbench,
-      title={Text2GQL-Bench: A Text to Graph Query Language Benchmark [Experiment, Analysis & Benchmark]}, 
+      title={Text2GQL-Bench: A Text to Graph Query Language Benchmark [Experiment, Analysis \& Benchmark]},
       author={Songlin Lyu and Lujie Ban and Zihang Wu and Tianqi Luo and Jirong Liu and Chenhao Ma and Yuyu Luo and Nan Tang and Shipeng Qi and Heng Lin and Yongchao Liu and Chuntao Hong},
       year={2026},
       eprint={2602.11745},
       archivePrefix={arXiv},
       primaryClass={cs.AI},
-      url={https://arxiv.org/abs/2602.11745}, 
+      url={https://arxiv.org/abs/2602.11745},
+}
+
+% =============================================================================
+% Referencias fundacionales para el Capítulo 2 (marco teórico)
+% =============================================================================
+
+@inproceedings{Vaswani2017Attention,
+  title={Attention Is All You Need},
+  author={Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2017},
+  url={https://arxiv.org/abs/1706.03762}
+}
+
+@inproceedings{Brown2020GPT3,
+  title={Language Models are Few-Shot Learners},
+  author={Brown, Tom B. and Mann, Benjamin and Ryder, Nick and Subbiah, Melanie and Kaplan, Jared and Dhariwal, Prafulla and Neelakantan, Arvind and Shyam, Pranav and Sastry, Girish and Askell, Amanda and others},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2020},
+  url={https://arxiv.org/abs/2005.14165}
+}
+
+@article{Ji2023Hallucination,
+  title={Survey of Hallucination in Natural Language Generation},
+  author={Ji, Ziwei and Lee, Nayeon and Frieske, Rita and Yu, Tiezheng and Su, Dan and Xu, Yan and Ishii, Etsuko and Bang, Yejin and Madotto, Andrea and Fung, Pascale},
+  journal={ACM Computing Surveys},
+  volume={55},
+  number={12},
+  year={2023},
+  url={https://arxiv.org/abs/2202.03629}
+}
+
+@inproceedings{Maynez2020Faithfulness,
+  title={On Faithfulness and Factuality in Abstractive Summarization},
+  author={Maynez, Joshua and Narayan, Shashi and Bohnet, Bernd and McDonald, Ryan},
+  booktitle={Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics (ACL)},
+  year={2020},
+  url={https://arxiv.org/abs/2005.00661}
+}
+
+@article{Codd1970Relational,
+  title={A Relational Model of Data for Large Shared Data Banks},
+  author={Codd, Edgar F.},
+  journal={Communications of the ACM},
+  volume={13},
+  number={6},
+  pages={377--387},
+  year={1970},
+  doi={10.1145/362384.362685}
+}
+
+@article{Angles2017Graph,
+  title={Foundations of Modern Query Languages for Graph Databases},
+  author={Angles, Renzo and Arenas, Marcelo and Barcel{\'o}, Pablo and Hogan, Aidan and Reutter, Juan and Vrgo{\v{c}}, Domagoj},
+  journal={ACM Computing Surveys},
+  volume={50},
+  number={5},
+  year={2017},
+  doi={10.1145/3104031}
+}
+
+@inproceedings{ZelleMooney1996,
+  title={Learning to Parse Database Queries using Inductive Logic Programming},
+  author={Zelle, John M. and Mooney, Raymond J.},
+  booktitle={Proceedings of the Thirteenth National Conference on Artificial Intelligence (AAAI)},
+  year={1996},
+  pages={1050--1055}
+}
+
+@article{Chomsky1956Three,
+  title={Three Models for the Description of Language},
+  author={Chomsky, Noam},
+  journal={IRE Transactions on Information Theory},
+  volume={2},
+  number={3},
+  pages={113--124},
+  year={1956},
+  doi={10.1109/TIT.1956.1056813}
+}
+
+@book{Aho2006Compilers,
+  title={Compilers: Principles, Techniques, and Tools},
+  author={Aho, Alfred V. and Lam, Monica S. and Sethi, Ravi and Ullman, Jeffrey D.},
+  edition={2},
+  publisher={Addison-Wesley},
+  year={2006},
+  isbn={9780321486813}
+}
+
+@book{Pierce2002Types,
+  title={Types and Programming Languages},
+  author={Pierce, Benjamin C.},
+  publisher={MIT Press},
+  year={2002},
+  isbn={9780262162098}
+}
+
+@techreport{ChenTY1998Metamorphic,
+  title={Metamorphic Testing: A New Approach for Generating Next Test Cases},
+  author={Chen, Tsong Yueh and Cheung, Shing Chi and Yiu, Shiu Ming},
+  institution={Department of Computer Science, Hong Kong University of Science and Technology},
+  number={HKUST-CS98-01},
+  year={1998}
 }
