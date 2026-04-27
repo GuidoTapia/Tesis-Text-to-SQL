@@ -1,578 +1,953 @@
+
 \chapter{Arquitecturas y Enfoques Actuales en Text-to-Query}
-\label{chap:stateoftheart}
+\label{cap:estado-del-arte}
 
-% =============================================================================
-% Capítulo 3 — Estado del Arte
-% Tesis: Arquitectura basada en representación intermedia para la generación
-% confiable de consultas SQL/PGQ desde lenguaje natural
-% Autor: Guido Luis Tapia Oré
-% Asesor: Dra. Regina Paola Ticona Herrera
-% =============================================================================
+El capítulo anterior presentó los fundamentos necesarios para comprender la generación \emph{text-to-query}: los modelos de lenguaje, sus posibles alucinaciones, las representaciones intermedias, la decodificación restringida, los mecanismos de verificación y el estándar híbrido \ac{SQL}/\ac{PGQ}. A partir de esa base, este capítulo revisa los principales enfoques actuales en sistemas \emph{text-to-query}.
 
+La revisión no se plantea como una lista cronológica de trabajos, sino como un análisis organizado por dimensiones. Esta decisión responde a que la literatura reciente aborda el problema desde criterios diversos: algunas revisiones clasifican los sistemas según la arquitectura del modelo utilizado, otras según la etapa del \emph{pipeline} que buscan mejorar, y otras según la estrategia de \emph{prompting} empleada~\cite{NLinterfaces}. Aunque estas clasificaciones son útiles, no siempre permiten comparar los trabajos bajo criterios comunes ni identificar con claridad las brechas de investigación.
 
-El capítulo anterior estableció los fundamentos conceptuales que sostienen
-la generación \emph{text-to-query}: modelos de lenguaje y sus alucinaciones,
-representaciones intermedias, decodificación restringida, mecanismos de
-verificación y el estándar híbrido \ac{SQL}/\ac{PGQ}. Sobre esa base, el
-presente capítulo analiza el estado del arte en sistemas \emph{text-to-query}
-avanzados. La revisión no se organiza de forma cronológica ni como un inventario
-de trabajos, sino en torno a un marco analítico común que permite contrastar
-propuestas heterogéneas bajo preguntas estructurales uniformes.
+Por ello, este capítulo adopta una taxonomía multidimensional para analizar la literatura de manera más ordenada. Esta taxonomía distingue entre el paradigma de aprendizaje, la arquitectura de orquestación, la estrategia de representación, los mecanismos de enriquecimiento contextual, el tipo de razonamiento utilizado y las propiedades evaluativas que cada enfoque busca optimizar.
 
-La literatura reciente presenta una dispersión notable de criterios de
-clasificación: las \emph{surveys} disponibles agrupan los trabajos, en unos
-casos, por la arquitectura del modelo de lenguaje subyacente, en otros por la
-fase del \emph{pipeline} que optimizan, y en otros por el tipo de
-\emph{prompting} que emplean~\cite{NLinterfaces}. Estas clasificaciones, aunque
-útiles, tienden a mezclar niveles de abstracción heterogéneos y dificultan la
-identificación sistemática de vacíos de investigación. Por ello, este capítulo
-adopta como eje analítico una taxonomía multidimensional que distingue de forma
-explícita entre el paradigma de aprendizaje, la arquitectura de orquestación,
-la estrategia de representación, los mecanismos de enriquecimiento contextual,
-el paradigma de razonamiento y las propiedades evaluativas objetivo. Sobre
-este marco, cada sección analiza una dimensión de la literatura, cierra con
-observaciones críticas y articula, al final del capítulo, la brecha de
-investigación que motiva la propuesta de la tesis.
+Cada sección desarrolla una de estas dimensiones, presenta los enfoques más relevantes y cierra con observaciones críticas sobre sus alcances y limitaciones. Finalmente, el capítulo sintetiza los hallazgos principales y formula la brecha de investigación que motiva la propuesta desarrollada en esta tesis.
 
 \section{Marco taxonómico de análisis}
 \label{sec:sota-taxonomia}
 
-Antes de revisar trabajos concretos es necesario definir el criterio bajo el
-cual se los compara. La taxonomía utilizada en este capítulo responde a seis
-preguntas estructurales, formuladas de manera que cada una aísle un aspecto
-conceptualmente independiente de los sistemas \emph{text-to-query}. Estas
-preguntas se enuncian a continuación.
+Resolver el problema \emph{text-to-query} en entornos empresariales obliga a
+considerar simultáneamente decisiones de aprendizaje, de orquestación
+arquitectónica, de representación, de enriquecimiento contextual, de
+estrategia de razonamiento y de criterios de evaluación. Estas decisiones
+operan en planos distintos del sistema y, en la práctica, se han combinado de
+formas muy variadas en la literatura. Para categorizar correctamente esta
+diversidad es importante considerar que:
 
 \begin{enumerate}
-    \item \textbf{Paradigma de aprendizaje.} ¿Cómo se ajusta, o no, el modelo
-    base a la tarea? Las opciones principales son el aprendizaje en contexto
-    con parámetros congelados, el \emph{fine-tuning} supervisado, el
-    pre-entrenamiento continual, el aprendizaje por refuerzo con señal de
-    ejecución y las combinaciones híbridas de los anteriores.
-    \item \textbf{Arquitectura del sistema.} ¿Cómo se orquestan los componentes
-    que producen la consulta? Las alternativas van desde sistemas monolíticos
-    \emph{end-to-end} hasta \emph{pipelines} modulares, marcos multi-agente,
-    arquitecturas agénticas con búsqueda y esquemas de generación-reordenamiento.
-    \item \textbf{Estrategia de representación.} ¿Cómo se codifica la entrada,
-    qué representación intermedia se utiliza y cómo se decodifica la salida?
-    Esta dimensión se descompone en tres sub-ejes que se examinan por separado.
-    \item \textbf{Mecanismos de enriquecimiento contextual.} ¿Qué información
-    adicional, más allá de la pregunta y el esquema, se moviliza? Aquí se
-    agrupan el \emph{schema linking}, la recuperación de contenido de la base
-    de datos, la integración de conocimiento externo y los mecanismos de
-    auto-refinamiento.
-    \item \textbf{Paradigma de razonamiento.} ¿Qué estructura cognitiva
-    explícita guía la generación? Las opciones incluyen generación directa,
-    cadena de pensamiento, descomposición, exploración multi-camino y bucles
-    iterativos con retroalimentación.
-    \item \textbf{Propiedades evaluativas objetivo.} ¿Qué propiedades prioriza
-    explícitamente cada propuesta? Entre ellas se encuentran la corrección, la
-    eficiencia del modelo y de la consulta generada, la robustez, la
-    adaptabilidad de dominio, la escalabilidad a esquemas de gran tamaño y la
-    interpretabilidad.
+    \item La generación \emph{text-to-query} es una tarea de traducción entre
+    lenguaje natural y un lenguaje de consulta formal sujeto a un esquema
+    específico.
+
+    \item Los sistemas pueden operar con un \ac{LLM} cuyos parámetros se
+    mantienen fijos, con un \ac{LLM} ajustado a la tarea, o mediante
+    combinaciones de ambas estrategias.
+
+    \item La generación puede producirse en una sola invocación del modelo o
+    distribuirse entre módulos especializados que cooperan en un
+    \emph{pipeline} o en un esquema multiagente.
+
+    \item La consulta final puede generarse directamente sobre el lenguaje
+    objetivo o pasar primero por una representación estructurada intermedia
+    que separe la interpretación semántica de la sintaxis del lenguaje
+    destino.
+
+    \item El conocimiento contextual disponible para el modelo
+    ---esquema, contenido de la base de datos, ejemplos demostrativos,
+    documentación de dominio--- puede aprovecharse de formas distintas y con
+    diferentes garantías de fidelidad.
+
+    \item El razonamiento que conduce de la pregunta a la consulta puede ser
+    directo, descompuesto en pasos intermedios, generado en múltiples
+    candidatos paralelos o iterado mediante retroalimentación.
+
+    \item Los criterios bajo los cuales un sistema se considera adecuado
+    varían según el contexto: corrección semántica, eficiencia de ejecución,
+    robustez ante variaciones del esquema, adaptabilidad a nuevos dominios,
+    escalabilidad y nivel de interpretabilidad de la consulta generada.
 \end{enumerate}
 
-Este marco permite examinar cada trabajo como un vector de decisiones a lo
-largo de las seis dimensiones, en lugar de como un punto singular sobre un
-eje cronológico. Las secciones siguientes no revisan los seis ejes de
-forma independiente, sino que los utilizan como lente transversal para
-analizar cinco grandes familias de enfoques: \emph{pipelines} por etapas
-con representación intermedia (Sección~\ref{sec:sota-pipelines}),
-sistemas multi-agente y arquitecturas agénticas con búsqueda
-(Sección~\ref{sec:sota-multiagente}), decodificación restringida y
-verificación post-generación (Sección~\ref{sec:sota-decodificacion}),
-robustez del esquema en entornos empresariales (Sección~\ref{sec:sota-robustez})
-y generación de consultas híbridas sobre el estándar \ac{SQL}/\ac{PGQ}
-(Sección~\ref{sec:sota-hibridas}). Cada sección se cierra con una
-observación crítica breve; tras revisar los criterios de evaluación
-empleados en la literatura (Sección~\ref{sec:sota-evaluacion}), el
-capítulo se cierra con una síntesis de vacíos argumentada
-(Sección~\ref{sec:sota-sintesis}). Como referencia transversal, el
-Cuadro~\ref{tab:sota-taxonomia} resume el vector taxonómico de los
-trabajos centrales discutidos a continuación.
+Por lo tanto, en base a estas consideraciones, se desarrolló una taxonomía
+con seis dimensiones ortogonales para clasificar los sistemas
+\emph{text-to-query}. Las dimensiones se diseñaron para aislar aspectos
+conceptualmente independientes, evitar la mezcla de niveles de abstracción
+presente en clasificaciones existentes y permitir el etiquetado múltiple
+cuando un trabajo combine varias categorías dentro de una misma dimensión.
+A continuación se detalla cada dimensión:
 
-\begin{table}[htb]
-    \centering
-    \caption{Vector taxonómico de los trabajos centrales revisados, proyectado sobre los seis ejes definidos en la Sección~\ref{sec:sota-taxonomia}. La última fila ubica la propuesta de la presente tesis. Las celdas con guion (``---'') indican que la dimensión no es objetivo declarado del trabajo o no es aplicable.}
-    \label{tab:sota-taxonomia}
-    \resizebox{\textwidth}{!}{%
-    \footnotesize
-    \begin{tabular}{l l l l l l l}
-        \toprule
-        \textbf{Trabajo} & \textbf{Aprendizaje} & \textbf{Arquitectura} & \textbf{Representación} & \textbf{Enriquecimiento} & \textbf{Razonamiento} & \textbf{Propiedad eval.} \\
-        \midrule
-        \textsc{RAT-SQL}        & FT supervisado          & Monolítico                & Atención relacional      & \emph{Schema linking}             & Directo                          & Corrección \\
-        \textsc{IRNet}          & FT supervisado          & Pipeline                  & \textsc{SemQL}           & \emph{Schema linking}             & Directo                          & Corrección \\
-        \textsc{RESDSQL}        & FT supervisado          & Pipeline 2 etapas         & \emph{Skeleton}          & \emph{Schema linking}             & Directo                          & Corrección \\
-        \textsc{DIN-SQL}        & ICL                     & Pipeline 4 etapas         & Plantilla \ac{SQL}       & \emph{Schema linking}             & Descomp. + auto-corr.            & Corrección \\
-        \textsc{MAC-SQL}        & ICL                     & Multi-agente fijo         & Plantilla \ac{SQL}       & \emph{Schema linking} + ejec.     & Descomposición                   & Corrección \\
-        \textsc{CHASE-SQL}      & ICL + selector FT       & Agéntica con búsqueda     & Múltiples cadenas        & Ejec. + selector                  & Multi-camino + \emph{reranking}  & Corrección \\
-        \textsc{Alpha-SQL}      & ICL + MCTS              & Agéntica con búsqueda     & Estados parciales        & Ejecución                         & Búsqueda explícita               & Corrección \\
-        \textsc{PICARD}         & FT + decod. restringida & Monolítico + parser       & ---                      & ---                               & Directo restringido              & Validez sintáctica \\
-        \textsc{TA-SQL}         & ICL                     & Pipeline                  & \emph{Alignment} interm. & \emph{Schema linking}             & Pre-alineamiento                 & Mitigación de alucin. \\
-        \textsc{CRED-SQL}       & ICL                     & Pipeline                  & EDL ejecutable           & Recuperación por \emph{clusters}  & Descomposición                   & Escalabilidad \\
-        \textsc{STRuCT-LLM}     & RL (GRPO)               & Monolítico                & ---                      & Ejecución (\ac{SQL}+\textsc{Cypher}) & Directo                       & Razonamiento dual \\
-        \textsc{SQLHD}          & ICL                     & Pipeline + verificación   & ---                      & ---                               & Auto-refinamiento metamórfico    & Detección de alucin. \\
-        \textsc{BLENDSQL}       & ICL                     & Pipeline                  & \ac{SQL} extendido       & Recup. texto+tabla                & Directo                          & Cobertura híbrida \\
-        \textsc{SchemaGraphSQL} & ICL + grafos            & Pipeline                  & ---                      & Grafo del esquema                 & Búsqueda de camino               & Escalabilidad \\
-        \midrule
-        \textbf{Propuesta (esta tesis)} & ICL + verificación & Pipeline tipado    & \ac{RI} tipada \ac{SQL}/\ac{PGQ} & \emph{Schema linking} + \emph{grounding} & Restringido + verif. iter. & Validez y \emph{grounding} híbrido \\
-        \bottomrule
-    \end{tabular}%
-    }
-\end{table}
+\begin{enumerate}
+    \item \textbf{Paradigma de aprendizaje:} cómo se ajusta, o no, el
+    modelo base a la tarea \emph{text-to-query}. Considera tres ramas:
 
-\section{Pipelines por etapas y representaciones intermedias}
-\label{sec:sota-pipelines}
+    \begin{enumerate}
+        \item \emph{Parameter-frozen}: los parámetros del modelo no se
+        modifican; la adaptación ocurre en el \emph{prompt}, ya sea sin
+        ejemplos (\emph{zero-shot}), con ejemplos fijos (\emph{few-shot
+        in-context learning}) o con ejemplos seleccionados dinámicamente
+        mediante recuperación.
 
-Una de las líneas más consolidadas de la literatura parte de una observación
-estructural: la generación monolítica de \ac{SQL} a partir de texto libre
-obliga al modelo de lenguaje a resolver simultáneamente problemas heterogéneos,
-tales como desambiguar la pregunta, identificar las tablas y columnas
-relevantes, producir la estructura sintáctica correcta y ajustar los valores
-literales al contenido real de la base de datos. Los trabajos agrupados en
-esta línea descomponen el problema en etapas, con frecuencia articuladas
-alrededor de una representación intermedia, y asignan cada etapa a un módulo
-especializado.
+        \item \emph{Parameter-tuned}: los parámetros se modifican mediante
+        \emph{fine-tuning} supervisado, preentrenamiento continuo,
+        aprendizaje multi-tarea o aprendizaje por refuerzo.
 
-El trabajo precursor de esta tradición es \textsc{IRNet}~\cite{IRNet}, que
-introduce \textsc{SemQL} como representación intermedia que abstrae las
-particularidades sintácticas de cada dialecto \ac{SQL} y separa la
-interpretación semántica del \emph{binding} concreto al esquema. La
-generalización de esta idea en la era \ac{PLM} se refleja en
-\textsc{RAT-SQL}~\cite{RAT-SQL2021}, que incorpora atención consciente de
-relaciones para codificar conjuntamente la pregunta y el esquema, y en
-\textsc{RESDSQL}~\cite{RESDSQL2023}, que desacopla el \emph{schema linking}
-del \emph{skeleton parsing}, codifica los elementos del esquema mediante un
-ranker y genera primero una plantilla estructural (\emph{skeleton}) antes de
-producir la consulta final. Trabajos posteriores refuerzan esta línea desde
-ángulos complementarios: \textsc{Graphix-T5}~\cite{Graphix-T52022} integra
-capas conscientes del grafo del esquema en un modelo \textsc{T5};
-\textsc{BRIDGE}~\cite{BRIDGE2020} introduce \emph{anchor texts} que enlazan
-valores de la pregunta con celdas del esquema; y
-\textsc{SmBoP}~\cite{SmBoP2021} propone un decodificador semi-autorregresivo
-ascendente que construye sub-árboles sintácticos en paralelo, reduciendo la
-complejidad de la decodificación a un régimen logarítmico en la profundidad
-del árbol.
+        \item \emph{Híbridos}: combinan componentes congelados con
+        componentes ajustados, típicamente un generador adaptado y un
+        seleccionador o reordenador con parámetros propios.
+    \end{enumerate}
 
-En la transición hacia modelos de gran escala, la representación intermedia
-se reinterpreta como artefacto de \emph{prompting}. \textsc{DIN-SQL}~%
-\cite{DIN-SQL2023} reorganiza el proceso en cuatro etapas (clasificación,
-descomposición, generación y autocorrección) y se convierte en referencia
-obligada para cualquier propuesta modular posterior. \textsc{MAC-SQL}~%
-\cite{MAC-SQL2023} lleva esta descomposición al nivel arquitectónico al
-asignar cada responsabilidad a un agente distinto: un \emph{Selector} filtra
-el esquema, un \emph{Decomposer} fragmenta la pregunta en sub-consultas y un
-\emph{Refiner} valida la ejecución. \textsc{DEA-SQL}~\cite{DEA-SQL2024}
-formaliza esta idea como un paradigma de \emph{workflow}, mientras que
-\textsc{DTS-SQL}~\cite{DTS-SQL2024} demuestra que la descomposición es
-especialmente útil cuando el modelo base es pequeño, ya que permite ajustar
-cada sub-modelo a una sub-tarea más acotada.
+    \item \textbf{Arquitectura del sistema:} cómo se organiza el cómputo
+    entre invocaciones del modelo y módulos auxiliares. Se distinguen
+    arquitecturas \emph{monolíticas} (una sola invocación que produce la
+    consulta), \emph{pipelines modulares} (etapas secuenciales con
+    responsabilidades separadas), \emph{multiagente} (agentes con roles
+    definidos que cooperan), \emph{agentic-search} (exploración guiada del
+    espacio de soluciones) y \emph{generate-and-rerank} (generación de varios
+    candidatos seguida de selección).
 
-Una variante conceptualmente distinta consiste en introducir representaciones
-intermedias específicas para razonamiento semántico o estructural, en lugar
-de plantillas \ac{SQL}. \textsc{CHESS}~\cite{CHESS2024} estructura el proceso
-como una cadena de módulos con razonamiento contextual; \textsc{TA-SQL}~%
-\cite{TA-SQL2024} introduce una fase de \emph{alignment} previa a la
-generación con el propósito explícito de mitigar alucinaciones;
-\textsc{SteinerSQL2025}~\cite{SteinerSQL2025} propone una descomposición
-matemática basada en árboles de Steiner para guiar el razonamiento;
-\textsc{CRED-SQL}~\cite{CRED-SQL2025} introduce un \emph{Execution Description
-Language} como representación intermedia ejecutable, orientada específicamente
-a bases de datos de gran escala; y \textsc{Gen-SQL}~\cite{Gen-SQL2025} propone
-un esquema pseudo-intermedio que media entre la pregunta y el esquema real.
-Merecen mención aparte \textsc{PARSQL}~\cite{PARSQL2025}, que combina
-\emph{parsing} y razonamiento en modelos pequeños con reordenamiento
-\emph{best-of-n}, y \textsc{CodeS}~\cite{CodeS2024}, que adopta una estrategia
-opuesta al introducir pre-entrenamiento continual sobre corpus específicos de
-\ac{SQL}, trasladando la complejidad al modelo mismo y reduciéndola en el
-\emph{pipeline} de inferencia.
+    \item \textbf{Representación:} qué estructuras intermedias intervienen
+    entre la entrada en lenguaje natural y la consulta final. Esta dimensión
+    se subdivide en tres ejes complementarios:
 
-\paragraph{Observación crítica.} La descomposición en etapas ha producido
-mejoras sostenidas en los benchmarks cerrados como \textsc{Spider} y
-\textsc{BIRD}, pero al precio de una fragmentación metodológica considerable.
-Cada propuesta introduce su propia representación intermedia, con grados
-variables de formalización: desde gramáticas explícitas como \textsc{SemQL} y
-\textsc{NatSQL}, hasta plantillas semi-estructuradas y formatos ad hoc. Esta
-heterogeneidad dificulta comparaciones directas y, más importante, pocos
-trabajos reportan propiedades formales verificables sobre la representación
-intermedia que justifiquen su uso más allá del desempeño empírico. Existe,
-además, una tensión no resuelta entre la expresividad de la representación
-intermedia y su capacidad de compilarse de forma determinista a \ac{SQL}
-válido respecto a un esquema concreto; esta tensión se agrava, como se
-argumentará más adelante, al introducir patrones de grafo.
+    \begin{enumerate}
+        \item \emph{Codificación de entrada}: cómo se representan la
+        pregunta y el esquema antes de generar (texto plano, esquema
+        serializado, grafos del esquema, vectores densos).
 
-\section{Sistemas multi-agente y arquitecturas agénticas con búsqueda}
-\label{sec:sota-multiagente}
+        \item \emph{Representación intermedia}: si el sistema utiliza
+        una RI explícita y de qué tipo, distinguiendo seis subcategorías
+        ---ausencia de RI, esquema serializado como RI implícita, lenguaje
+        intermedio dedicado, plan estructurado, árbol abstracto y
+        descomposición declarativa.
 
-Una evolución natural de los \emph{pipelines} modulares consiste en sustituir
-el flujo secuencial predeterminado por una arquitectura en la que varios
-agentes especializados colaboran o compiten, bien mediante protocolos fijos
-de intercambio, bien mediante un controlador que decide dinámicamente el
-siguiente paso. La literatura reciente muestra una proliferación de este
-tipo de sistemas, con diferencias sustantivas que conviene explicitar para no
-colapsarlos bajo la misma etiqueta.
+        \item \emph{Decodificación}: cómo se restringe o no la
+        generación de la consulta final (libre, con restricción gramatical,
+        composicional o por compilación desde la RI).
+    \end{enumerate}
 
-\textsc{MAC-SQL}~\cite{MAC-SQL2023} es representativo de la variante con
-roles fijos: los tres agentes mencionados operan bajo un flujo
-predeterminado, y la colaboración consiste en el intercambio de
-representaciones parciales entre etapas. \textsc{OpenSearch-SQL}~%
-\cite{OpenSearch-SQL2025} extiende esta idea introduciendo un módulo de
-\emph{Alignment} entre agentes y un mecanismo de \emph{dynamic few-shot}
-que selecciona ejemplos de demostración según la pregunta. Por su parte,
-\textsc{XiYan-SQL}~\cite{XiYan-SQL2024} propone un \emph{Multi-Generator
-Ensemble} en el que distintos generadores producen candidatos que un modelo
-de selección reordena, y combina aprendizaje en contexto con
-\emph{fine-tuning} del componente selector. \textsc{ROUTE}~%
-\cite{ROUTE2025} adopta una estrategia complementaria: en lugar de congelar
-los modelos y orquestar agentes sobre ellos, realiza \emph{Multi-task
-Supervised Fine-Tuning} sobre cinco sub-tareas de \emph{text-to-SQL} y
-después integra los modelos ajustados bajo un esquema de \emph{Multi-agent
-Collaborative Prompting}.
+    \item \textbf{Mecanismos de enriquecimiento contextual:} qué
+    información adicional se aporta al modelo para anclar su salida al
+    esquema y al dominio. Considera cuatro mecanismos:
 
-Un salto cualitativo aparece en las arquitecturas agénticas con búsqueda
-explícita, en las que el flujo de ejecución no está predeterminado sino que
-es controlado dinámicamente. \textsc{CHASE-SQL}~\cite{CHASE-SQL2025} ilustra
-este desplazamiento: genera candidatos de consulta mediante tres cadenas de
-razonamiento diferentes (una basada en divide y vencerás, otra en planes de
-ejecución y otra en ejemplos sintéticos ajustados a la instancia), aplica un
-\emph{Query Fixer} guiado por ejecución y selecciona el candidato final
-mediante comparaciones pareadas con un selector ajustado. Más radical aún es
-\textsc{Alpha-SQL}~\cite{Alpha-SQL2025}, que utiliza \emph{Monte Carlo Tree
-Search} sobre estados parciales de razonamiento, con el modelo de lenguaje
-actuando como \emph{Action Model} que propone expansiones del árbol.
+    \begin{enumerate}
+        \item \emph{Schema linking}: asociación explícita entre menciones del
+        texto y elementos del esquema.
 
-En el espectro opuesto, trabajos como \textsc{DAIL-SQL}~\cite{DAIL-SQL2023}
-muestran que un sistema monolítico bien diseñado, con selección cuidadosa de
-demostraciones y \emph{prompting} estructurado, puede alcanzar resultados
-competitivos sin necesidad de orquestación multi-agente. Otros trabajos
-exploran dimensiones específicas: \textsc{PET-SQL}~\cite{PET-SQL2024}
-introduce un esquema de \emph{cross-consistency} entre múltiples modelos de
-lenguaje; \textsc{PURPLE}~\cite{PURPLE2024} recupera \emph{skeletons} lógicos
-como ejemplos de \emph{few-shot}; \textsc{MetaSQL}~\cite{MetaSQL2024}
-formaliza el paradigma \emph{generate-then-rank} con generación condicionada
-por metadatos; \textsc{G\textsuperscript{3}R}~\cite{G3R2023} combina
-generación guiada por grafos con reordenamiento enriquecido con conocimiento
-de dominio; y \textsc{N-best List Rerankers}~\cite{N-bestListRerankers2022}
-establece las bases del reordenamiento con \textsc{T5} y decodificación
-restringida por \textsc{PICARD}. Más recientemente,
-\textsc{STRuCT-LLM}~\cite{STRuCT-LLM2026} propone unificar el razonamiento tabular y de grafos mediante aprendizaje
-por refuerzo con \emph{Group-Relative Policy Optimization}, introduciendo
-una señal de recompensa basada en ejecución que se aplica tanto a \ac{SQL}
-como a \textsc{Cypher}. Esto es especialmente relevante para la presente
-tesis, dado que anticipa la necesidad de métodos que operen sobre lenguajes
-de consulta heterogéneos de forma simultánea.
+        \item \emph{Recuperación de contenido de la base de datos}:
+        incorporación de valores reales de columnas para resolver
+        ambigüedades léxicas.
 
-\paragraph{Observación crítica.} La terminología asociada a estas
-arquitecturas es considerablemente imprecisa en la literatura. Etiquetas
-como ``colaboración'', ``multi-agente'' y ``sistema agéntico'' se aplican
-indistintamente a sistemas que difieren en aspectos esenciales, como el
-grado de dinamismo del flujo de control o el nivel de acoplamiento entre
-componentes. La distinción entre un \emph{pipeline} modular con varias etapas
-y un sistema genuinamente multi-agente requiere, para no ser trivial, una
-operacionalización explícita; sin ella, la taxonomía se reduce a una
-etiqueta de márketing.
+        \item \emph{Conocimiento externo}: integración de glosarios,
+        documentación de dominio o restricciones de negocio.
 
-Un segundo problema transversal es la opacidad del balance
-costo-beneficio. \textsc{CHASE-SQL}, por ejemplo, moviliza simultáneamente
-tres modelos de frontera (\textsc{GPT-4}, \textsc{Gemini} y \textsc{Claude})
-para generar candidatos, con lo cual resulta difícil atribuir la mejora
-observada al método propuesto frente al efecto de \emph{ensembling} de
-modelos heterogéneos. En el mismo sentido, los mecanismos de búsqueda
-explícita como \textsc{MCTS} en \textsc{Alpha-SQL} presentan costos
-computacionales raramente reportados en detalle, lo cual limita su
-aplicabilidad en escenarios empresariales con restricciones de latencia.
+        \item \emph{Auto-refinamiento}: ciclos en los que el sistema observa
+        errores en la consulta generada y la corrige.
+    \end{enumerate}
 
-\section{Decodificación restringida y verificación post-generación}
-\label{sec:sota-decodificacion}
+    \item \textbf{Paradigma de razonamiento:} cómo se estructura el
+    proceso de inferencia que conduce a la consulta. Distingue razonamiento
+    \emph{directo}, en \emph{cadena de pensamiento (chain-of-thought)},
+    \emph{descompositivo}, de \emph{múltiples caminos} y de
+    \emph{retroalimentación iterativa}.
 
-Una línea paralela a las anteriores aborda el problema desde la óptica del
-control formal de la salida. El supuesto subyacente es que las alucinaciones
-sintácticas pueden eliminarse de raíz si el decodificador consulta una
-gramática formal en cada paso, y que las alucinaciones semánticas pueden
-detectarse con mecanismos de verificación que operan sobre la consulta
-generada o sobre su ejecución.
+    \item \textbf{Propiedades evaluativas objetivo:} qué propiedades del
+    sistema son priorizadas explícitamente por el trabajo, distinguiendo
+    \emph{corrección}, \emph{eficiencia}, \emph{robustez}, \emph{adaptabilidad},
+    \emph{escalabilidad} e \emph{interpretabilidad}.
+\end{enumerate}
 
-El trabajo canónico en decodificación restringida es \textsc{PICARD}~%
-\cite{PICARD2022}, que integra una gramática de \ac{SQL} en el proceso
-autorregresivo para descartar continuaciones inválidas en tiempo real. La
-contribución es metodológicamente significativa porque desacopla la validez
-sintáctica de la confianza del modelo. Esta idea ha sido reutilizada en
-múltiples trabajos posteriores: \textsc{RASAT}~\cite{RASAT2022} combina
-\textsc{PICARD} con atención consciente de relaciones;
-\textsc{TKK}~\cite{TKK2022} la utiliza dentro de un esquema de aprendizaje
-multi-tarea; y \textsc{SHiP}~\cite{SHiP2022} la adapta para el entrenamiento
-con datos sintéticos. Un refinamiento notable es
-\textsc{SQLformer}~\cite{SQLFormer2023}, que propone generar directamente un
-grafo de consulta de forma auto-regresiva, unificando representación y
-decodificación en un solo proceso. En un registro más pragmático,
-\textsc{CatSQL}~\cite{CatSQL2023} combina aprendizaje profundo con
-plantillas basadas en reglas para aplicaciones reales.
+A partir de esta categorización, las secciones siguientes revisan la
+literatura reciente analizando, por dimensión, cómo se han posicionado los
+trabajos representativos. La revisión se concentra en propuestas publicadas
+mayoritariamente entre 2017 y 2026, abarcando desde los primeros sistemas
+neuronales basados en codificadores especializados hasta las arquitecturas
+multiagente más recientes sustentadas en \acp{LLM}. Cada sección cierra con
+una observación crítica que identifica patrones, limitaciones y vacíos
+relevantes para la presente investigación.
 
-El complemento natural de la decodificación restringida es la verificación
-post-generación. Aquí la literatura se bifurca en dos aproximaciones que
-conviene distinguir con precisión. La primera es la verificación estática
-sobre una representación intermedia o sobre el \ac{SQL} generado, que
-comprueba propiedades como la existencia de columnas referenciadas, la
-consistencia de claves foráneas en las uniones y la compatibilidad de tipos
-en las condiciones lógicas~\cite{RAT-SQL2021}. La segunda es la
-verificación dinámica, que utiliza el \ac{RDBMS} como oráculo parcial: se
-ejecuta la consulta en un entorno controlado y se analizan señales como
-errores de ejecución, valores nulos inesperados o cardinalidades anómalas.
-Trabajos como \textsc{ErrorLLM}~\cite{errorllm2026} formalizan los tipos de
-error que pueden detectarse en este régimen, mientras que
-\textsc{SQLHD}~\cite{SQLHD2025} propone un esquema de detección de
-alucinaciones en dos etapas basado en relaciones metamórficas, en la línea
-conceptual de Chi~\cite{WrenAI2025}.
+\section{Paradigma de Aprendizaje}
+\label{sec:sota-d1-aprendizaje}
 
-Los mecanismos de auto-refinamiento constituyen una familia emparentada.
-\textsc{DIN-SQL}~\cite{DIN-SQL2023} incorpora un módulo de autocorrección
-\emph{zero-shot}; \textsc{TS-SQL}~\cite{TS-SQL2025} propone un
-auto-refinamiento dirigido por casos de prueba generados; y
-\textsc{SelECT-SQL}~\cite{SC-Prompt2023} combina \emph{ensembling} con
-autocorrección en una estrategia de \emph{chain-of-thought}. En el ámbito
-del \emph{prompting} especializado, \textsc{ACT-SQL}~\cite{ACT-SQL2023}
-genera cadenas de pensamiento automáticamente, \textsc{ODIS}~%
-\cite{ODIS2023} selecciona demostraciones en función del dominio, y
-\textsc{C3-SQL}~\cite{C3-SQL2023} formaliza un protocolo \emph{zero-shot}
-con calibración y consistencia. En contextos multi-turno,
-\textsc{CoE-SQL}~\cite{CoE-SQL2024} introduce una cadena de ediciones que
-refina la consulta a lo largo del diálogo.
+Esta sección describe cómo los sistemas \emph{text-to-query} se relacionan
+con su modelo base. Aunque la mayoría de los trabajos analizados se
+construyen sobre \acp{LLM} o sobre arquitecturas tipo \emph{encoder-decoder}
+preentrenadas, se distinguen tres estrategias fundamentales: mantener los
+parámetros del modelo congelados, ajustarlos mediante entrenamiento adicional
+o combinar ambas estrategias en componentes distintos del sistema.
 
-\paragraph{Observación crítica.} La decodificación restringida garantiza la
-validez sintáctica pero resulta insuficiente, por construcción, frente a
-las alucinaciones semánticas: una consulta puede ser sintácticamente
-impecable y, al mismo tiempo, referenciar una columna que no existe o
-plantear una unión inválida. La verificación dinámica cubre parcialmente
-este vacío, pero introduce sus propias limitaciones: un resultado vacío
-puede ser correcto o incorrecto, dependiendo de la pregunta, y la ejecución
-costosa no es viable en bucles de refinamiento agresivos sobre esquemas
-grandes. Además, los mecanismos de verificación actuales están diseñados
-para \ac{SQL} puro; su extensión a consultas que combinan cláusulas
-relacionales y patrones de grafo aún no ha sido abordada de manera
-sistemática en la literatura revisada.
+\subsection{Aprendizaje con parámetros congelados}
+\label{subsec:sota-d1-frozen}
 
-\section{Robustez del esquema y entornos empresariales}
-\label{sec:sota-robustez}
+En esta categoría, la adaptación a la tarea ocurre exclusivamente a través
+del \emph{prompt}, sin modificar los parámetros del modelo. La distinción
+relevante dentro de la categoría es cómo se construye dicho \emph{prompt}.
 
-Las tres líneas anteriores fueron evaluadas mayoritariamente sobre
-benchmarks cerrados como \textsc{Spider}~\cite{Spider2018} y
-\textsc{BIRD}~\cite{BIRD2023}, los cuales, pese a su utilidad, representan escenarios
-idealizados respecto a los entornos empresariales reales. Una línea reciente
-de investigación pone el foco en la degradación del desempeño al desplazarse
-hacia esquemas masivos, con nomenclaturas complejas, datos ruidosos y flujos
-analíticos de múltiples pasos.
+\paragraph{(a) Zero-shot.} Algunos trabajos prescinden por completo de
+ejemplos y se apoyan únicamente en una descripción del esquema y en la
+pregunta del usuario. C3-SQL~\cite{C3-SQL2023} es representativo de este
+enfoque: con un \emph{prompt} cuidadosamente diseñado y sin ejemplos
+demostrativos, alcanza resultados competitivos sobre Spider apoyándose en la
+calidad del modelo subyacente. Alpha-SQL~\cite{Alpha-SQL2025}, aun siendo un
+sistema agéntico, opera \emph{zero-shot} en el sentido de que no requiere
+demostraciones específicas del dominio: explora el espacio de consultas
+mediante búsqueda guiada sobre prompts dinámicos. La principal limitación
+de esta sub-categoría es que su desempeño depende fuertemente del modelo
+base y se degrada notoriamente en esquemas complejos o atípicos.
 
-\textsc{Spider 2.0}~\cite{spider2_2025} es el benchmark más influyente en
-esta línea: documenta una caída drástica de los sistemas del estado del arte
-al enfrentarse a consultas empresariales reales, y formaliza métricas que
-capturan dimensiones ausentes en benchmarks previos. En el plano de los
-métodos, \textsc{CRED-SQL}~\cite{CRED-SQL2025} aborda la escala mediante
-recuperación por \emph{clusters} de esquema y una representación intermedia
-ejecutable; \textsc{FinSQL}~\cite{FinSQL2024} propone un marco específico
-para el dominio financiero; \textsc{RSL-SQL}~\cite{RSL-SQL2024} introduce
-\emph{schema linking} bidireccional con aumento contextual;
-\textsc{CRUSH4SQL}~\cite{CRUSH4SQL2023} combina recuperación densa con
-alucinación controlada del esquema; y
-\textsc{SchemaGraphSQL}~\cite{SchemaGraphSQL} aplica algoritmos de camino
-sobre el grafo del esquema para guiar el \emph{schema linking}. Desde el
-lado de la robustez, el trabajo de Fürst et al.~\cite{EvaluatingRobustness}
-evalúa sistemáticamente la resiliencia frente a modelos de datos reales, y
-\textsc{AmbiSQL}~\cite{AmbiSQL} aborda la detección y resolución
-interactiva de ambigüedades en la pregunta del usuario.
+\paragraph{(b) Few-shot in-context learning.} La mayoría de los sistemas
+recientes basados en \acp{LLM} pertenece a esta sub-categoría. La consulta
+se genera condicionada a un conjunto fijo o seleccionado de ejemplos
+(pregunta, consulta) que ilustran el comportamiento esperado.
+DIN-SQL~\cite{DIN-SQL2023} fue un trabajo influyente en esta línea: descompone
+la tarea en sub-pasos y diseña \emph{prompts} específicos para cada uno, con
+ejemplos curados manualmente. Sobre la misma base operan
+DAIL-SQL~\cite{DAIL-SQL2023}, ACT-SQL~\cite{ACT-SQL2023},
+SuperSQL~\cite{SuperSQL2024}, PET-SQL~\cite{PET-SQL2024},
+DEA-SQL~\cite{DEA-SQL2024}, RSL-SQL~\cite{RSL-SQL2024},
+CHESS~\cite{CHESS2024}, MAC-SQL~\cite{MAC-SQL2023},
+SteinerSQL~\cite{SteinerSQL2025}, TS-SQL~\cite{TS-SQL2025},
+Wren AI~\cite{WrenAI2025}, BLENDSQL~\cite{BLENDSQL2025},
+TA-SQL~\cite{TA-SQL2024}, CoE-SQL~\cite{CoE-SQL2024},
+PURPLE~\cite{PURPLE2024}, ODIS~\cite{ODIS2023},
+SelECT-SQL~\cite{SC-Prompt2023}, Gen-SQL~\cite{Gen-SQL2025},
+SGU-SQL~\cite{SGU-SQL2025}, CRED-SQL~\cite{CRED-SQL2025} y
+CRUSH4SQL~\cite{CRUSH4SQL2023}, entre otros. La diversidad de propuestas en
+esta sub-categoría refleja la madurez del paradigma, pero también una
+saturación: las mejoras incrementales suelen depender de ingeniería de
+\emph{prompts} más que de innovaciones arquitectónicas.
 
-La problemática de gobernanza y seguridad en entornos empresariales también
-ha recibido atención. \textsc{SAFENLIDB}~\cite{SAFENLIDB} propone un marco
-de alineación para interfaces en lenguaje natural con preservación de
-privacidad, y \textsc{LLM-FK}~\cite{llmfk} aborda la detección automática
-de claves foráneas en esquemas complejos como paso previo a una generación
-confiable. Desde la industria, el blog técnico de Wren AI~\cite{WrenAI2025}
-documenta prácticas de reducción de alucinaciones basadas en una capa
-semántica y en \emph{blueprints} de consulta.
+\paragraph{(c) In-context learning dinámico con recuperación.} Una refinación
+relevante consiste en seleccionar los ejemplos que se incluyen en el
+\emph{prompt} mediante recuperación, en función de la similitud con la
+pregunta entrante. OpenSearch-SQL~\cite{OpenSearch-SQL2025} ilustra esta
+estrategia con un módulo dedicado de recuperación de ejemplos. El propio
+CRED-SQL~\cite{CRED-SQL2025} contempla esta estrategia como extensión
+opcional. La principal ventaja sobre el \emph{few-shot} estático es la
+adaptabilidad a dominios heterogéneos, aunque introduce dependencia de la
+calidad del corpus de ejemplos disponibles.
 
-\paragraph{Observación crítica.} Los trabajos revisados en esta sección
-muestran de forma consistente que el desempeño empírico sobre benchmarks
-cerrados sobreestima la capacidad real de los sistemas en entornos
-empresariales. Las propuestas concretas que abordan esta degradación
-(\textsc{CRED-SQL}, \textsc{RSL-SQL}, \textsc{CRUSH4SQL},
-\textsc{SchemaGraphSQL}) intervienen sobre dimensiones parciales del
-problema ---recuperación por \emph{clusters}, enlazado bidireccional,
-alucinación controlada del esquema, búsqueda sobre el grafo del
-esquema---, pero no se integran en un marco común que articule el
-\emph{schema linking} con mecanismos de verificación posterior. Los
-componentes de gobernanza y seguridad, por su parte, son tratados como
-problemas adyacentes y rara vez se incorporan al \emph{pipeline} de
-generación.
+\subsection{Aprendizaje con parámetros ajustados}
+\label{subsec:sota-d1-tuned}
 
-\section{Generación de consultas híbridas sobre el estándar SQL/PGQ}
-\label{sec:sota-hibridas}
+En esta categoría se modifican los parámetros del modelo mediante
+entrenamiento adicional sobre datos específicos de la tarea. Es la familia
+históricamente más extendida en \emph{text-to-SQL} previa al auge de los
+\acp{LLM} de propósito general.
 
-La línea de investigación más cercana al objeto de esta tesis es la
-generación de consultas híbridas sobre esquemas que combinan el modelo
-relacional con patrones de grafo. El estándar ISO/IEC 9075-16:2023
-formaliza la integración de \ac{SQL} con \ac{PGQ}~\cite{ISO9075_16_2023};
-herramientas como \textsc{DuckPGQ}~\cite{DuckPGQ} demuestran que los
-patrones de grafo pueden compilarse a \ac{SQL} puro dentro de un motor
-relacional, con lo que la ejecución se vuelve tratable. La literatura
-específicamente orientada a la generación \emph{text-to-query} sobre este
-estándar es, sin embargo, aún incipiente.
+\paragraph{(a) Fine-tuning supervisado.} Trabajos como
+Seq2SQL~\cite{Seq2SQL2017}, BRIDGE~\cite{BRIDGE2020},
+RAT-SQL~\cite{RAT-SQL2021}, SmBoP~\cite{SmBoP2021},
+RaSaP~\cite{RaSaP2021}, SHiP~\cite{SHiP2022},
+RASAT~\cite{RASAT2022}, PICARD~\cite{PICARD2022},
+S²SQL~\cite{S2SQL2022}, Graphix-T5~\cite{Graphix-T52022},
+RESDSQL~\cite{RESDSQL2023}, T5-3B+NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023},
+SQLFormer~\cite{SQLFormer2023}, CatSQL~\cite{CatSQL2023} y
+DTS-SQL~\cite{DTS-SQL2024} ajustan modelos completos sobre conjuntos como
+Spider o WikiSQL. Las arquitecturas base varían desde redes específicas para
+\emph{text-to-SQL} (Seq2SQL, BRIDGE, RAT-SQL, SmBoP) hasta variantes de T5
+adaptadas (PICARD, RESDSQL, Graphix-T5). Los sistemas de esta sub-categoría
+históricamente han alcanzado las precisiones más altas en benchmarks
+controlados, aunque su costo de entrenamiento y su dependencia del dominio
+de entrenamiento limitan su transferencia directa a entornos empresariales.
 
-El trabajo más directamente alineado es
-\textsc{STRuCT-LLM}~\cite{STRuCT-LLM2026}, que unifica razonamiento
-tabular y de grafos mediante aprendizaje por refuerzo con señal de
-ejecución, aplicada simultáneamente a \ac{SQL} y \textsc{Cypher}. También
-son relevantes \textsc{BLENDSQL}~\cite{BLENDSQL2025}, que extiende
-\ac{SQL} para unificar la respuesta a preguntas híbridas sobre datos
-tabulares y texto no estructurado, y
-\textsc{SGU-SQL}~\cite{SGU-SQL2025}, que introduce una codificación
-basada en grafos del esquema relacional como apoyo a la generación.
-Recientemente, \textsc{Text2GQL-Bench}~\cite{text2gqlbench} se propone
-como primer benchmark sistemático de generación a lenguajes de consulta
-sobre grafos, aunque no incluye consultas que integren simultáneamente
-los paradigmas relacional y de grafo bajo un estándar común como
-\ac{SQL}/\ac{PGQ}.
+\paragraph{(b) Preentrenamiento continuo.} CodeS~\cite{CodeS2024} representa
+una variante intermedia: parte de un modelo de código preentrenado de
+propósito general y aplica preentrenamiento continuo sobre un corpus
+masivo orientado a SQL antes del \emph{fine-tuning} supervisado final. La
+estrategia mejora la transferencia a dominios desconocidos, pero requiere
+infraestructura considerable y un corpus de entrenamiento curado.
 
-\paragraph{Observación crítica.} Los trabajos revisados comparten un
-patrón estructural: o bien tratan los grafos como un lenguaje separado
-(\textsc{Cypher}, \textsc{GQL}), o bien unifican paradigmas heterogéneos
-pero no específicamente el definido por el estándar \ac{SQL}/\ac{PGQ}.
-Ningún sistema de los identificados en esta revisión incorpora una
-representación intermedia tipada que cubra simultáneamente operadores
-relacionales y patrones de grafo, ni mecanismos de verificación que
-contemplen la coherencia cruzada entre ambos componentes. La intersección
-con la línea anterior ---robustez del esquema bajo condiciones
-empresariales--- queda, por consiguiente, sin abordar de forma
-sistemática.
+\paragraph{(c) Aprendizaje multi-tarea.} Algunos trabajos entrenan el modelo
+sobre varias tareas relacionadas para mejorar la generalización.
+TKK~\cite{TKK2022} aborda \emph{text-to-SQL} junto con tareas auxiliares
+de comprensión de esquema. ROUTE~\cite{ROUTE2025} adopta el aprendizaje
+multi-tarea como principio organizador del \emph{fine-tuning},
+integrando tareas de generación, corrección y razonamiento sobre esquemas.
+PARSQL~\cite{PARSQL2025} sigue una línea similar al combinar generación con
+selección entre candidatos. La motivación común es que las tareas auxiliares
+fuerzan al modelo a desarrollar representaciones internas más robustas del
+esquema y de la sintaxis SQL.
 
-\section{Criterios de evaluación y señales empíricas}
-\label{sec:sota-evaluacion}
+\paragraph{(d) Aprendizaje por refuerzo.} STRuCT-LLM~\cite{STRuCT-LLM2026}
+% TODO: la entrada STRuCT-LLM2026 figura como ICLR 2025; verificar año/venue.
+incorpora aprendizaje por refuerzo para alinear la generación con
+señales de ejecución y con tareas de razonamiento sobre tablas y grafos
+simultáneamente. Seq2SQL~\cite{Seq2SQL2017}, en una época mucho más
+temprana, ya empleaba aprendizaje por refuerzo basado en la recompensa de
+ejecución. La adopción del paradigma sigue siendo minoritaria pero ha
+resurgido con fuerza en propuestas recientes orientadas a unificar
+razonamiento estructurado con generación.
 
-La comparación entre los trabajos revisados está mediada por los benchmarks
-y métricas empleados. \textsc{Spider}~\cite{Spider2018} y
-\textsc{BIRD}~\cite{BIRD2023} se han establecido como referencias de facto para evaluar corrección;
-\textsc{CoSQL}~\cite{CoSQL2019} y \textsc{SParC}~\cite{SParC2019} se
-utilizan para escenarios conversacionales; \textsc{Spider 2.0}~%
-\cite{spider2_2025} introduce complejidad empresarial; y trabajos como
-\textsc{SuperSQL}~\cite{SuperSQL2024} ofrecen análisis sistemáticos del
-estado del arte que son útiles para contextualizar las mejoras reportadas.
-Por su parte, benchmarks específicos como \textsc{AmbiSQL}~\cite{AmbiSQL}
-evalúan la capacidad de detectar ambigüedad, mientras que
-\textsc{Text2GQL-Bench}~\cite{text2gqlbench} abre la evaluación hacia
-lenguajes de consulta sobre grafos.
+\subsection{Estrategias híbridas}
+\label{subsec:sota-d1-hibridas}
 
-Las métricas dominantes (\emph{Execution Accuracy}, \emph{Exact Match} y,
-más recientemente, \emph{Valid Efficiency Score}) capturan la corrección y
-la eficiencia ejecutiva, pero dejan parcialmente fuera propiedades como la
-verificabilidad estructural, la interpretabilidad del razonamiento y la
-trazabilidad de las decisiones intermedias. Estas propiedades son
-especialmente relevantes en escenarios empresariales, donde la auditoría
-de la consulta generada constituye un requisito operativo.
+Una fracción creciente de los sistemas más recientes combina componentes
+con parámetros congelados y componentes ajustados.
+XiYan-SQL~\cite{XiYan-SQL2024} adopta una arquitectura multiagente en la que
+un generador puede ser un \ac{LLM} ajustado de la familia
+XiYanSQL-QwenCoder mientras que módulos auxiliares operan
+\emph{in-context}. CHASE-SQL~\cite{CHASE-SQL2025} combina generadores
+\emph{in-context} con un seleccionador entrenado mediante \emph{fine-tuning}.
+ZeroNL2SQL~\cite{ZeroNL2SQL2024} distribuye la carga entre un modelo
+preentrenado pequeño y un \ac{LLM} congelado. MetaSQL~\cite{MetaSQL2024}
+aplica un esquema análogo en la fase de selección sobre múltiples
+candidatos. La motivación es pragmática: aprovechar la capacidad de
+generalización de los \acp{LLM} sin renunciar al control fino que provee
+el ajuste sobre los componentes críticos.
 
-Desde el lado industrial, documentos como el de Adedeji y
-Mabere~\cite{Data2Decisions}, el estudio de Pérez et al.~\cite{llm-insight}
-y la revisión de interfaces en lenguaje natural de Quamar et
-al.~\cite{NLinterfaces} enmarcan estos requisitos y documentan la distancia
-entre el desempeño de investigación y las exigencias reales de producción.
-Esta brecha contextualiza la necesidad de propiedades evaluativas
-complementarias que la presente tesis busca abordar.
+\subsection{Observaciones críticas}
+\label{subsec:sota-d1-obs}
 
-\paragraph{Observación crítica.} El espacio evaluativo de la literatura
-revisada está fuertemente sesgado hacia métricas de corrección ejecutiva
-sobre benchmarks fijos. Propiedades estructurales como la
-verificabilidad de la consulta antes de su ejecución, la trazabilidad de
-las decisiones intermedias del modelo y la sensibilidad a perturbaciones
-controladas del esquema reciben un tratamiento marginal, pese a su
-relevancia para escenarios empresariales auditables. Esta carencia
-metodológica es coherente con la fragmentación observada en las secciones
-previas: sin un marco evaluativo común para propiedades estructurales, la
-comparación entre arquitecturas de mediación formal queda restringida al
-plano del desempeño agregado.
+La revisión de esta dimensión muestra un desplazamiento progresivo del
+\emph{fine-tuning} de extremo a extremo hacia configuraciones híbridas
+y \emph{in-context}. Esta tendencia es coherente con el aumento del costo
+computacional asociado al entrenamiento de \acp{LLM} de gran tamaño. Sin
+embargo, los sistemas puramente \emph{in-context} acumulan dos
+limitaciones recurrentes: dependencia fuerte del modelo subyacente, lo
+que dificulta auditar el sistema desde el punto de vista de gobernanza, y
+ausencia de mecanismos formales para garantizar que la salida respete
+el esquema. La investigación de la presente tesis se posiciona como
+agnóstica al paradigma de aprendizaje subyacente: el énfasis se traslada
+a la representación intermedia y al bucle de verificación, de modo que
+la corrección estructural no descanse exclusivamente en la calidad
+estadística del generador.
 
-\section{Síntesis, tensiones y vacíos de investigación}
+\section{Arquitectura del Sistema}
+\label{sec:sota-d2-arquitectura}
+
+Esta sección describe cómo se organiza el cómputo en los sistemas
+\emph{text-to-query}. La distinción es independiente del paradigma de
+aprendizaje: un mismo paradigma puede dar lugar a arquitecturas
+monolíticas, modulares, multiagente, agénticas o de generación con
+reordenamiento.
+
+\subsection{Arquitecturas monolíticas}
+\label{subsec:sota-d2-monoliticas}
+
+En las arquitecturas monolíticas, una sola invocación del modelo produce
+la consulta completa. Es la configuración natural de los sistemas
+\emph{end-to-end} entrenados para mapear pregunta a consulta directamente.
+Pertenecen a esta categoría Seq2SQL~\cite{Seq2SQL2017},
+BRIDGE~\cite{BRIDGE2020}, RAT-SQL~\cite{RAT-SQL2021},
+SmBoP~\cite{SmBoP2021}, RaSaP~\cite{RaSaP2021}, RASAT~\cite{RASAT2022},
+PICARD~\cite{PICARD2022}, S²SQL~\cite{S2SQL2022},
+Graphix-T5~\cite{Graphix-T52022}, T5-3B+NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023},
+SQLFormer~\cite{SQLFormer2023}, CatSQL~\cite{CatSQL2023},
+SHiP~\cite{SHiP2022}, CodeS~\cite{CodeS2024},
+DAIL-SQL~\cite{DAIL-SQL2023}, ACT-SQL~\cite{ACT-SQL2023},
+ODIS~\cite{ODIS2023}, SGU-SQL~\cite{SGU-SQL2025} y
+STRuCT-LLM~\cite{STRuCT-LLM2026}. Aunque algunos de estos sistemas
+internamente realizan operaciones de codificación o decodificación
+sofisticadas, conceptualmente la generación de la consulta es una sola
+inferencia. La ventaja principal de esta organización es la simplicidad
+operativa; la desventaja es que cualquier error se propaga sin posibilidad
+de inspección intermedia ni de intervención modular.
+
+\subsection{Pipelines modulares}
+\label{subsec:sota-d2-pipelines}
+
+En esta categoría, la generación se distribuye entre etapas secuenciales
+con responsabilidades distintas: típicamente \emph{schema linking},
+generación, validación y refinamiento. DIN-SQL~\cite{DIN-SQL2023} popularizó
+una variante influyente del enfoque, descomponiendo el proceso en cuatro
+sub-tareas. La línea ha sido seguida por numerosos trabajos:
+RESDSQL~\cite{RESDSQL2023}, DTS-SQL~\cite{DTS-SQL2024},
+PURPLE~\cite{PURPLE2024}, RSL-SQL~\cite{RSL-SQL2024},
+DEA-SQL~\cite{DEA-SQL2024}, CoE-SQL~\cite{CoE-SQL2024},
+PET-SQL~\cite{PET-SQL2024}, SuperSQL~\cite{SuperSQL2024},
+TA-SQL~\cite{TA-SQL2024}, FinSQL~\cite{FinSQL2024},
+TKK~\cite{TKK2022}, ZeroNL2SQL~\cite{ZeroNL2SQL2024},
+SteinerSQL~\cite{SteinerSQL2025}, Gen-SQL~\cite{Gen-SQL2025},
+BLENDSQL~\cite{BLENDSQL2025}, CRED-SQL~\cite{CRED-SQL2025},
+CRUSH4SQL~\cite{CRUSH4SQL2023}, SelECT-SQL~\cite{SC-Prompt2023},
+CHESS~\cite{CHESS2024}, C3-SQL~\cite{C3-SQL2023} y
+Wren AI~\cite{WrenAI2025}. Los \emph{pipelines} modulares facilitan la
+inspección, el reemplazo de componentes y la integración con sistemas de
+verificación, lo que los hace especialmente atractivos para entornos
+empresariales. Su limitación principal es la rigidez del orden de
+ejecución y la posible amplificación de errores entre etapas.
+
+\subsection{Arquitecturas multiagente}
+\label{subsec:sota-d2-multiagente}
+
+Una variante reciente del enfoque modular dota a cada componente de
+autonomía e iniciativa, configurándolo como un agente que se comunica con
+otros mediante mensajes. MAC-SQL~\cite{MAC-SQL2023} fue uno de los
+primeros trabajos en formalizar esta organización para \emph{text-to-SQL},
+con agentes especializados en \emph{schema linking}, descomposición y
+refinamiento. CHESS~\cite{CHESS2024} extiende esta línea con cuatro
+agentes ---recuperación de información, selección de esquema, generación
+y verificación--- e incorpora un agente \emph{Unit Tester} que actúa como
+verificador semántico. OpenSearch-SQL~\cite{OpenSearch-SQL2025} y
+TS-SQL~\cite{TS-SQL2025} adoptan también una organización multiagente.
+XiYan-SQL~\cite{XiYan-SQL2024} combina varios agentes generadores con un
+agente seleccionador. La diferencia operativa entre un \emph{pipeline}
+modular y un sistema multiagente es a menudo gradual; en la práctica, lo
+distintivo del enfoque multiagente es la capacidad de varios componentes
+de invocar al modelo de forma asíncrona o cíclica.
+
+\subsection{Arquitecturas agentic-search}
+\label{subsec:sota-d2-agentic}
+
+Algunos trabajos abandonan la idea de un orden fijo y adoptan en su lugar
+una exploración guiada del espacio de soluciones.
+Alpha-SQL~\cite{Alpha-SQL2025} ilustra esta categoría: utiliza un modelo
+para proponer acciones (refinar el esquema, generar un fragmento, verificar
+una sub-consulta) y un mecanismo de búsqueda para decidir qué acción
+ejecutar a continuación. CHASE-SQL~\cite{CHASE-SQL2025} también incorpora
+elementos de exploración, aunque combinados con generación múltiple. La
+ventaja del enfoque es su flexibilidad ante consultas complejas; su
+desventaja, el costo computacional asociado a la búsqueda y la dificultad
+de garantizar terminación.
+
+\subsection{Arquitecturas de generación con reordenamiento}
+\label{subsec:sota-d2-rerank}
+
+En esta categoría, el sistema produce varios candidatos de consulta y un
+módulo posterior selecciona el mejor. CHASE-SQL~\cite{CHASE-SQL2025},
+XiYan-SQL~\cite{XiYan-SQL2024} y MetaSQL~\cite{MetaSQL2024} adoptan
+explícitamente esta estrategia. PARSQL~\cite{PARSQL2025} también opera
+sobre un conjunto de candidatos y G³R~\cite{G³R2023}
+% TODO: revisar superíndice Unicode en la clave G³R2023; conservar tal cual está en el .bib
+incorpora una etapa de reordenamiento basada en alineación. Trabajos
+clásicos como N-best List Rerankers~\cite{N-bestListRerankers2022} sentaron
+las bases del enfoque. La motivación es robusta: si el generador produce un
+candidato correcto entre varios, un reordenador entrenado puede
+recuperarlo aún cuando no sea el más probable a priori. La debilidad es la
+dependencia de la diversidad real del conjunto generado.
+
+\subsection{Observaciones críticas}
+\label{subsec:sota-d2-obs}
+
+La distribución de los trabajos analizados por arquitectura muestra una
+migración progresiva desde sistemas monolíticos ---propios de la era
+\emph{pre-LLM}--- hacia \emph{pipelines} modulares, multiagente y
+agénticos. Esta evolución responde tanto a la creciente complejidad de las
+consultas objetivo como a la necesidad de inspeccionar y verificar la
+salida en entornos críticos. Sin embargo, una limitación común a las
+arquitecturas modulares y multiagente es que la verificación semántica,
+cuando existe, suele ejecutarse al final del proceso sobre la consulta ya
+generada, y rara vez se realiza sobre una representación intermedia que
+admita análisis estático. Esta brecha es uno de los puntos que la
+propuesta de la presente tesis aborda explícitamente.
+
+\section{Estrategias de Representación}
+\label{sec:sota-d3-representacion}
+
+La forma en que un sistema representa la pregunta, el esquema y la
+consulta en formación condiciona qué tipos de errores puede detectar y
+qué tipos de control puede ejercer sobre la salida. Esta sección agrupa
+los trabajos según los tres ejes complementarios de la dimensión:
+codificación de la entrada, representación intermedia entre comprensión y
+generación, y estrategia de decodificación de la consulta final.
+
+\subsection{Codificación de la entrada}
+\label{subsec:sota-d3a-encoding}
+
+\paragraph{(a) Esquema serializado en lenguaje natural.} La práctica
+dominante en sistemas basados en \acp{LLM} consiste en serializar el
+esquema como un fragmento de texto que se concatena con la pregunta.
+DIN-SQL~\cite{DIN-SQL2023}, DAIL-SQL~\cite{DAIL-SQL2023},
+ACT-SQL~\cite{ACT-SQL2023}, MAC-SQL~\cite{MAC-SQL2023},
+CHESS~\cite{CHESS2024} y la mayoría de los sistemas \emph{in-context}
+recientes emplean esta codificación. Su ventaja es la simplicidad y la
+compatibilidad universal con \acp{LLM}; su desventaja es que se pierden
+las relaciones estructurales del esquema, salvo que se reintroduzcan
+explícitamente en el texto.
+
+\paragraph{(b) Grafos del esquema.} Una línea de trabajos modela
+explícitamente el esquema como un grafo, donde los nodos representan
+tablas y columnas y las aristas representan claves foráneas y otras
+relaciones. RAT-SQL~\cite{RAT-SQL2021}, S²SQL~\cite{S2SQL2022} y
+Graphix-T5~\cite{Graphix-T52022} incorporan capas de atención sensibles
+a la estructura del grafo. La motivación es facilitar el razonamiento
+sobre uniones complejas y rutas de \emph{join} no triviales. El costo
+es una mayor complejidad arquitectónica y la necesidad de construir el
+grafo del esquema como paso de preprocesamiento.
+
+\paragraph{(c) Esquema enriquecido (M-Schema y similares).}
+XiYan-SQL~\cite{XiYan-SQL2024} introduce M-Schema, un formato que
+combina el esquema con metadatos y ejemplos de valores en una
+representación textual estructurada que el \ac{LLM} consume directamente.
+Esta codificación intermedia entre texto plano y grafo busca preservar
+la simplicidad del primero sin perder la información estructural del
+segundo. Otros trabajos, como CHESS~\cite{CHESS2024} y
+PET-SQL~\cite{PET-SQL2024}, adoptan formatos análogos en su etapa de
+preparación del \emph{prompt}.
+
+\paragraph{(d) Recuperación previa al modelo.} En esquemas masivos, no
+es viable serializar el esquema completo en el \emph{prompt}.
+CRUSH4SQL~\cite{CRUSH4SQL2023} aborda esta restricción mediante
+recuperación: un módulo previo selecciona los elementos del esquema
+relevantes para la pregunta antes de invocar al modelo.
+TS-SQL~\cite{TS-SQL2025} y SuperSQL~\cite{SuperSQL2024} contemplan
+estrategias análogas. El compromiso es entre cobertura ---no omitir
+elementos críticos--- y compacidad ---no saturar el contexto.
+
+\subsection{Representación intermedia}
+\label{subsec:sota-d3b-ir}
+
+Esta sub-dimensión es central para la presente tesis. Se distinguen seis
+sub-categorías según el tipo de RI que cada sistema utiliza, si es que
+utiliza alguna.
+
+\paragraph{(a) Sin RI explícita.} La consulta se genera directamente como
+secuencia de tokens del lenguaje destino. Pertenecen a esta categoría
+Seq2SQL~\cite{Seq2SQL2017}, BRIDGE~\cite{BRIDGE2020},
+DAIL-SQL~\cite{DAIL-SQL2023}, ACT-SQL~\cite{ACT-SQL2023},
+ODIS~\cite{ODIS2023}, SuperSQL~\cite{SuperSQL2024} y la mayoría de los
+sistemas \emph{in-context} basados en \emph{prompting}. La ausencia de
+RI explícita simplifica la arquitectura, pero traslada toda la carga de
+corrección estructural al generador.
+
+\paragraph{(b) Esquema como RI implícita.} Algunos trabajos no introducen
+una RI dedicada, pero usan el esquema enriquecido como sustrato sobre el
+cual se realiza el razonamiento previo a la generación. Es el caso de
+RAT-SQL~\cite{RAT-SQL2021} y, en parte, de XiYan-SQL~\cite{XiYan-SQL2024}
+con su M-Schema. La consulta sigue siendo SQL nativo, pero la
+representación del esquema actúa como puente estructurado.
+
+\paragraph{(c) Lenguaje intermedio dedicado.} La línea más explícita
+hacia una RI propiamente dicha la inicia IRNet con SemQL~\cite{IRNet}, un
+lenguaje intermedio que separa interpretación semántica de sintaxis SQL
+concreta. NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023}
+% TODO: NatSQL fue propuesto originalmente por Gan et al., 2021; revisar si
+% conviene agregar una entrada BibTeX dedicada para NatSQL como artefacto
+% lingüístico, independientemente del trabajo T5-3B+NatSQL.
+sigue una motivación análoga: define un lenguaje SQL simplificado sobre
+el que se entrena el modelo, y un compilador trivial lo convierte a SQL
+ejecutable. CatSQL~\cite{CatSQL2023} y ZeroNL2SQL~\cite{ZeroNL2SQL2024}
+contemplan formas similares de representación intermedia. La ventaja
+estructural es que la RI restringe el espacio de errores posibles del
+modelo; la limitación es que la RI suele estar acoplada a un dialecto
+específico de SQL.
+
+\paragraph{(d) Plan estructurado.} Algunos sistemas representan la
+consulta como un plan de ejecución o como una secuencia de operaciones
+declarativas. SQLFormer~\cite{SQLFormer2023} sigue parcialmente esta
+línea al organizar la generación alrededor de operaciones primitivas.
+SteinerSQL~\cite{SteinerSQL2025} representa la consulta como un árbol
+sobre el grafo del esquema, lo que se aproxima a una representación
+plan-céntrica. La ventaja es la trazabilidad del razonamiento; la
+limitación es el costo de adoptar y mantener un formalismo propio.
+
+\paragraph{(e) Árbol abstracto.} SmBoP~\cite{SmBoP2021} construye la
+consulta de forma composicional como un árbol abstracto sobre operadores
+relacionales, generando \emph{bottom-up}. PICARD~\cite{PICARD2022} no
+expone explícitamente un árbol como artefacto, pero su decodificación
+restringida opera implícitamente sobre la gramática del lenguaje, lo
+que lo posiciona en una categoría afín. RaSaP~\cite{RaSaP2021} y
+SQLFormer~\cite{SQLFormer2023} también incorporan estructura arbórea en
+distintos grados.
+
+\paragraph{(f) Descomposición declarativa.}
+DIN-SQL~\cite{DIN-SQL2023} introduce una forma específica de RI
+implícita: la pregunta se descompone en sub-preguntas y cada
+sub-pregunta produce una sub-consulta, que luego se ensambla. La
+descomposición no es una RI estructural, pero juega un papel análogo al
+distribuir el razonamiento. CHESS~\cite{CHESS2024} y
+MAC-SQL~\cite{MAC-SQL2023} adoptan estrategias similares.
+
+\subsection{Estrategias de decodificación}
+\label{subsec:sota-d3c-decoding}
+
+\paragraph{(a) Decodificación libre.} El modelo genera la consulta como
+texto sin restricciones formales. Es la estrategia dominante en sistemas
+\emph{in-context}: DIN-SQL~\cite{DIN-SQL2023}, DAIL-SQL~\cite{DAIL-SQL2023},
+ACT-SQL~\cite{ACT-SQL2023}, CHESS~\cite{CHESS2024},
+MAC-SQL~\cite{MAC-SQL2023}, OpenSearch-SQL~\cite{OpenSearch-SQL2025},
+XiYan-SQL~\cite{XiYan-SQL2024}, entre otros. Su ventaja es la
+flexibilidad; su desventaja, la posibilidad de generar consultas
+sintácticamente inválidas.
+
+\paragraph{(b) Decodificación restringida por gramática.}
+PICARD~\cite{PICARD2022} establece el patrón de referencia de esta
+categoría: integra una gramática de SQL en el decodificador para
+descartar en tiempo real candidatos que violen el lenguaje. La técnica
+elimina por completo los errores sintácticos al costo de una
+decodificación más cara. PICARD inspira aplicaciones posteriores en
+otros componentes de \emph{pipelines} modulares.
+
+\paragraph{(c) Decodificación composicional.} SmBoP~\cite{SmBoP2021}
+genera la consulta de manera \emph{bottom-up} sobre operadores
+relacionales, imponiendo estructura desde el inicio de la derivación.
+La estrategia es más compleja de implementar pero garantiza por
+construcción ciertos invariantes estructurales.
+
+\paragraph{(d) Compilación desde la representación intermedia.} Cuando
+el sistema utiliza una RI explícita, la decodificación final puede
+reducirse a la compilación determinista de la RI al lenguaje destino.
+IRNet~\cite{IRNet} y NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023}
+operan así: el modelo genera la RI y un componente determinista produce
+la consulta. Esta estrategia separa por completo el riesgo estadístico
+del riesgo formal.
+
+\subsection{Observaciones críticas}
+\label{subsec:sota-d3-obs}
+
+La revisión muestra que la mayoría de los sistemas recientes basados en
+\acp{LLM} ha priorizado simplificar la representación ---esquema
+serializado, decodificación libre, sin RI explícita--- delegando la
+corrección al generador. Esta decisión ha sido razonable mientras los
+benchmarks dominantes contenían esquemas de complejidad moderada y
+consultas SQL relativamente regulares. Sin embargo, en escenarios
+empresariales y, especialmente, en consultas híbridas sobre el estándar
+\ac{SQL}/\ac{PGQ}, la ausencia de RI explícita amplifica la propagación
+de alucinaciones estructurales: no existe una capa intermedia donde
+verificar la consistencia de tipos, la validez de las uniones o la
+coherencia entre los componentes relacionales y de patrón de grafo.
+La investigación de esta tesis se posiciona deliberadamente en la
+sub-categoría de RI explícita con compilación determinista, ampliada
+para cubrir tanto SQL como PGQ y enriquecida con verificación estática
+sobre la propia RI.
+
+\section{Mecanismos de Enriquecimiento Contextual}
+\label{sec:sota-d4-enriquecimiento}
+
+Esta sección agrupa las técnicas que aportan información adicional al
+modelo más allá de la pregunta y el esquema básico. Los cuatro
+mecanismos no son excluyentes: muchos sistemas combinan varios.
+
+\subsection{Schema linking}
+\label{subsec:sota-d4-schemalinking}
+
+El \emph{schema linking} consiste en establecer correspondencias
+explícitas entre menciones del texto y elementos del esquema (tablas,
+columnas, valores). Esta operación es central en \emph{text-to-SQL} y ha
+recibido tratamiento dedicado tanto como módulo independiente como
+integrado dentro de la arquitectura. RAT-SQL~\cite{RAT-SQL2021} la
+incorpora mediante atención sensible a relaciones del esquema.
+RESDSQL~\cite{RESDSQL2023}, DTS-SQL~\cite{DTS-SQL2024},
+DIN-SQL~\cite{DIN-SQL2023}, DEA-SQL~\cite{DEA-SQL2024},
+RSL-SQL~\cite{RSL-SQL2024}, CHESS~\cite{CHESS2024},
+MAC-SQL~\cite{MAC-SQL2023}, TA-SQL~\cite{TA-SQL2024},
+PURPLE~\cite{PURPLE2024}, TS-SQL~\cite{TS-SQL2025} y
+CRUSH4SQL~\cite{CRUSH4SQL2023}, entre otros, dedican un módulo o etapa
+específica al \emph{schema linking}. La calidad de esta etapa se
+correlaciona fuertemente con la corrección final del sistema, lo que
+explica la atención sostenida que ha recibido.
+
+\subsection{Recuperación de contenido de la base de datos}
+\label{subsec:sota-d4-content}
+
+Algunos sistemas incorporan valores reales de las columnas para resolver
+ambigüedades léxicas que el esquema solo no permite resolver
+---por ejemplo, distinguir entre dos columnas con nombres similares pero
+contenido distinto. BRIDGE~\cite{BRIDGE2020} fue uno de los primeros en
+hacerlo de forma sistemática. Trabajos posteriores como
+CHESS~\cite{CHESS2024}, FinSQL~\cite{FinSQL2024},
+PET-SQL~\cite{PET-SQL2024}, CHASE-SQL~\cite{CHASE-SQL2025},
+CRED-SQL~\cite{CRED-SQL2025} y SuperSQL~\cite{SuperSQL2024} adoptan
+estrategias análogas, recuperando muestras de valores relevantes para la
+pregunta. La eficacia depende de la calidad del proceso de recuperación
+y plantea desafíos cuando los datos contienen información sensible.
+
+\subsection{Conocimiento externo y de dominio}
+\label{subsec:sota-d4-external}
+
+En entornos empresariales, una fracción significativa de las consultas
+no puede resolverse correctamente sin conocimiento externo: glosarios de
+métricas, definiciones de dominio, restricciones de negocio. La línea
+de trabajos que aborda esta necesidad es comparativamente menor pero
+relevante. atscale2024sml~\cite{atscale2024sml} ilustra el uso de un
+\emph{semantic layer} corporativo. SAFENLIDB~\cite{SAFENLIDB} aborda el
+componente de privacidad y seguridad de la integración con conocimiento
+externo. ROUTE~\cite{ROUTE2025} incorpora señales de robustez que
+implícitamente requieren conocimiento adicional sobre el dominio.
+La principal limitación de esta categoría es la falta de
+estandarización: cada trabajo define su propio formato para representar
+el conocimiento externo, lo que dificulta la comparación.
+
+\subsection{Auto-refinamiento}
+\label{subsec:sota-d4-refinement}
+
+Una proporción creciente de sistemas incorpora ciclos en los que la
+consulta generada se ejecuta o se inspecciona, y los resultados o los
+errores se reintroducen al modelo para corrección.
+DIN-SQL~\cite{DIN-SQL2023} incluye una etapa de auto-corrección.
+MAC-SQL~\cite{MAC-SQL2023}, CHESS~\cite{CHESS2024},
+XiYan-SQL~\cite{XiYan-SQL2024}, OpenSearch-SQL~\cite{OpenSearch-SQL2025},
+DEA-SQL~\cite{DEA-SQL2024}, RSL-SQL~\cite{RSL-SQL2024},
+PURPLE~\cite{PURPLE2024} y CHASE-SQL~\cite{CHASE-SQL2025} adoptan
+variantes de este mecanismo. Los trabajos sobre detección de errores
+---ErrorLLM~\cite{errorllm2026}, SQLHD~\cite{SQLHD2025},
+AmbiSQL~\cite{AmbiSQL}--- proveen señales que, en principio, podrían
+alimentar el bucle de auto-refinamiento. La eficacia del mecanismo
+depende crucialmente de la naturaleza de la retroalimentación: cuando
+es texto libre, tiende a inducir oscilaciones; cuando es estructurada,
+puede converger más rápidamente.
+
+\subsection{Observaciones críticas}
+\label{subsec:sota-d4-obs}
+
+El \emph{schema linking} es el mecanismo más estudiado, mientras que la
+integración de conocimiento externo de dominio es claramente el menos
+desarrollado pese a su relevancia empresarial directa. El
+auto-refinamiento ha proliferado, pero la mayoría de las
+implementaciones operan sobre la consulta final como texto, lo que
+limita la precisión de la corrección posible y dificulta su análisis
+sistemático. Una arquitectura que opere sobre una RI tipada permite
+sustituir el bucle de auto-corrección sobre texto por
+retroalimentación estructurada que actúe sobre el nodo o la condición
+exacta donde se detectó el error.
+
+\section{Paradigma de Razonamiento}
+\label{sec:sota-d5-razonamiento}
+
+Esta sección agrupa los sistemas según cómo estructuran el proceso de
+inferencia que conduce de la pregunta a la consulta. El paradigma de
+razonamiento es independiente de la arquitectura del sistema: una
+arquitectura monolítica puede emplear razonamiento directo o en cadena,
+y un \emph{pipeline} modular puede operar de forma descompositiva o
+iterativa.
+
+\subsection{Razonamiento directo}
+\label{subsec:sota-d5-directo}
+
+El modelo produce la consulta sin pasos intermedios explícitos. Es la
+estrategia natural en sistemas \emph{end-to-end}:
+Seq2SQL~\cite{Seq2SQL2017}, BRIDGE~\cite{BRIDGE2020},
+RAT-SQL~\cite{RAT-SQL2021}, RASAT~\cite{RASAT2022},
+PICARD~\cite{PICARD2022}, Graphix-T5~\cite{Graphix-T52022},
+RESDSQL~\cite{RESDSQL2023}, T5-3B+NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023}
+y CodeS~\cite{CodeS2024}. Estos sistemas confían el razonamiento al
+proceso interno del modelo y a las representaciones intermedias
+implícitas que aprende durante el entrenamiento.
+
+\subsection{Cadena de pensamiento}
+\label{subsec:sota-d5-cot}
+
+Aquí el modelo expone, antes de la consulta, una traza textual del
+razonamiento que conduce a ella. ACT-SQL~\cite{ACT-SQL2023} es una
+referencia explícita en esta línea, con \emph{prompts} que inducen
+\emph{chain-of-thought} adaptado a \emph{text-to-SQL}.
+ODIS~\cite{ODIS2023}, DAIL-SQL~\cite{DAIL-SQL2023},
+PET-SQL~\cite{PET-SQL2024}, SuperSQL~\cite{SuperSQL2024},
+CoE-SQL~\cite{CoE-SQL2024} y CRED-SQL~\cite{CRED-SQL2025} adoptan
+variantes del enfoque. La principal limitación es que la traza textual
+no es verificable estructuralmente; el modelo puede producir un
+razonamiento aparentemente válido y aun así generar una consulta
+errónea.
+
+\subsection{Razonamiento descompositivo}
+\label{subsec:sota-d5-descompositivo}
+
+La pregunta se divide explícitamente en sub-preguntas, cada una de las
+cuales se resuelve por separado y se ensambla luego.
+DIN-SQL~\cite{DIN-SQL2023} es la referencia principal en esta línea.
+MAC-SQL~\cite{MAC-SQL2023}, CHESS~\cite{CHESS2024},
+DEA-SQL~\cite{DEA-SQL2024}, RSL-SQL~\cite{RSL-SQL2024},
+TA-SQL~\cite{TA-SQL2024}, SuperSQL~\cite{SuperSQL2024} y
+SteinerSQL~\cite{SteinerSQL2025} la adoptan en variantes propias. La
+descomposición es coherente con la observación práctica de que las
+consultas complejas se resuelven mejor cuando se atacan por partes,
+aunque introduce el riesgo de descomposiciones incorrectas que
+arrastran errores difíciles de localizar.
+
+\subsection{Razonamiento de múltiples caminos}
+\label{subsec:sota-d5-multipath}
+
+El sistema produce varias trayectorias o varios candidatos en paralelo y
+elige entre ellos. CHASE-SQL~\cite{CHASE-SQL2025},
+XiYan-SQL~\cite{XiYan-SQL2024}, MetaSQL~\cite{MetaSQL2024},
+PARSQL~\cite{PARSQL2025}, G³R~\cite{G³R2023} y
+N-best List Rerankers~\cite{N-bestListRerankers2022} pertenecen a esta
+sub-categoría. La motivación está sustentada por la observación
+empírica de que el candidato más probable según el modelo no es
+siempre el correcto; la diversidad del conjunto generado actúa como
+mecanismo de tolerancia a errores. La dificultad reside en construir un
+seleccionador o reordenador que efectivamente identifique el candidato
+correcto.
+
+\subsection{Razonamiento de retroalimentación iterativa}
+\label{subsec:sota-d5-iterativo}
+
+La consulta se refina en sucesivas iteraciones a partir de
+retroalimentación de ejecución, validación o un agente verificador.
+CHESS~\cite{CHESS2024} con su Unit Tester, MAC-SQL~\cite{MAC-SQL2023}
+con su agente de refinamiento, OpenSearch-SQL~\cite{OpenSearch-SQL2025},
+DIN-SQL~\cite{DIN-SQL2023}, RSL-SQL~\cite{RSL-SQL2024},
+DEA-SQL~\cite{DEA-SQL2024} y CHASE-SQL~\cite{CHASE-SQL2025} operan en
+ciclos iterativos. ErrorLLM~\cite{errorllm2026} y SQLHD~\cite{SQLHD2025}
+proveen modelos de detección de errores que pueden alimentar tales
+ciclos. AmbiSQL~\cite{AmbiSQL} aborda iterativamente la resolución de
+ambigüedades en interacción con el usuario. La efectividad del
+paradigma depende de que la retroalimentación sea informativa y
+discriminante; en su ausencia, el ciclo puede oscilar sin converger.
+
+\subsection{Observaciones críticas}
+\label{subsec:sota-d5-obs}
+
+La descomposición y la retroalimentación iterativa han desplazado al
+razonamiento directo en los sistemas más recientes basados en
+\acp{LLM}. Sin embargo, la cadena de pensamiento y la descomposición,
+en sus implementaciones predominantes, operan sobre texto libre y son
+por lo tanto difíciles de auditar y de verificar formalmente. La
+investigación de esta tesis explora una estrategia complementaria: la
+descomposición y la retroalimentación operan sobre una RI estructurada
+y tipada, lo que convierte cada paso del razonamiento en un artefacto
+inspectable y verificable mediante reglas explícitas.
+
+\section{Propiedades Evaluativas Objetivo}
+\label{sec:sota-d6-propiedades}
+
+Esta sección caracteriza la literatura por las propiedades del sistema
+que cada trabajo prioriza explícitamente en su evaluación. Se distinguen
+seis propiedades, no excluyentes, que guían el diseño y la
+experimentación.
+
+\subsection{Corrección}
+\label{subsec:sota-d6-correccion}
+
+La corrección, medida típicamente como exactitud de ejecución
+(\emph{execution accuracy}) o coincidencia exacta (\emph{exact match}),
+es la propiedad históricamente dominante. Prácticamente todos los
+trabajos analizados la reportan: Spider~\cite{spider2_2025}, BIRD
+% TODO: la clave li2023bird en el .bib corresponde a un paper de visión
+% por computador, no al benchmark BIRD de Yu et al. La cita debería
+% reemplazarse cuando se incorpore una entrada BibTeX correcta para
+% el dataset BIRD.
+y otros benchmarks han consolidado su uso como métrica de referencia.
+La crítica recurrente, presente en
+EvaluatingRobustness~\cite{EvaluatingRobustness} y en
+NLinterfaces~\cite{NLinterfaces}, es que la exactitud sobre benchmarks
+controlados sobreestima el desempeño en entornos reales.
+
+\subsection{Eficiencia}
+\label{subsec:sota-d6-eficiencia}
+
+Una fracción menor de trabajos prioriza explícitamente la eficiencia de
+la consulta generada, no solo la corrección de su resultado.
+CodeScore~\cite{CodeScore} y atscale2024sml~\cite{atscale2024sml}
+contemplan métricas asociadas. SuperSQL~\cite{SuperSQL2024},
+PET-SQL~\cite{PET-SQL2024} y FinSQL~\cite{FinSQL2024} reportan
+parcialmente costos de ejecución. La VES (\emph{Valid Efficiency Score})
+introducida en BIRD ha promovido un mayor interés en la propiedad. Su
+relevancia es directa en entornos empresariales, donde dos consultas
+correctas pueden diferir órdenes de magnitud en costo de ejecución.
+
+\subsection{Robustez}
+\label{subsec:sota-d6-robustez}
+
+Pertenecen a esta categoría los trabajos que evalúan el desempeño bajo
+perturbaciones del esquema, paráfrasis de la pregunta o cambios en el
+dominio. EvaluatingRobustness~\cite{EvaluatingRobustness},
+ROUTE~\cite{ROUTE2025}, SQLHD~\cite{SQLHD2025},
+ErrorLLM~\cite{errorllm2026} y AmbiSQL~\cite{AmbiSQL} adoptan la
+robustez como propiedad central. Spider 2.0~\cite{spider2_2025}
+desplaza la evaluación hacia escenarios empresariales donde la
+robustez se vuelve crítica. La consolidación de esta dimensión es
+todavía incipiente: no existe un protocolo único de evaluación de
+robustez aceptado por la comunidad.
+
+\subsection{Adaptabilidad}
+\label{subsec:sota-d6-adaptabilidad}
+
+La adaptabilidad mide la capacidad del sistema para generalizar a
+nuevos dominios o esquemas no vistos durante el entrenamiento.
+ZeroNL2SQL~\cite{ZeroNL2SQL2024}, FinSQL~\cite{FinSQL2024},
+SchemaGraphSQL~\cite{SchemaGraphSQL} y CRED-SQL~\cite{CRED-SQL2025}
+priorizan explícitamente esta dimensión. La preocupación es relevante
+en entornos empresariales donde el esquema cambia con el tiempo y donde
+no es viable reentrenar el sistema con cada cambio.
+
+\subsection{Escalabilidad}
+\label{subsec:sota-d6-escalabilidad}
+
+La escalabilidad considera el comportamiento del sistema ante esquemas
+masivos, bases de datos con miles de tablas o cargas de trabajo
+sostenidas. CRUSH4SQL~\cite{CRUSH4SQL2023}, llmfk~\cite{llmfk},
+CodeS~\cite{CodeS2024} y CHASE-SQL~\cite{CHASE-SQL2025} la abordan
+parcialmente. La intersección con eficiencia es directa, pero la
+escalabilidad introduce además consideraciones sobre la ventana de
+contexto del modelo y sobre el costo amortizado del \emph{schema
+linking}.
+
+\subsection{Interpretabilidad}
+\label{subsec:sota-d6-interpretabilidad}
+
+La interpretabilidad se refiere a la posibilidad de inspeccionar y
+explicar el proceso que conduce a la consulta generada. Los trabajos
+que adoptan RI explícita ---IRNet~\cite{IRNet},
+NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023}--- y los que producen
+trazas estructuradas ---DIN-SQL~\cite{DIN-SQL2023},
+CHESS~\cite{CHESS2024}, MAC-SQL~\cite{MAC-SQL2023}--- ofrecen mayor
+interpretabilidad por construcción. La propiedad cobra relevancia
+particular en aplicaciones empresariales sujetas a auditoría y
+gobernanza, contexto en el que la generación opaca de un sistema
+\emph{end-to-end} resulta difícilmente admisible.
+
+\subsection{Observaciones críticas}
+\label{subsec:sota-d6-obs}
+
+La literatura presenta un sesgo claro hacia la corrección como
+propiedad casi excluyente, en detrimento de eficiencia, robustez,
+adaptabilidad y, sobre todo, interpretabilidad. Spider 2.0 y BIRD han
+contribuido a redirigir parte de la atención hacia robustez y
+eficiencia, pero la interpretabilidad sigue tratada de forma marginal.
+Para el contexto empresarial al que se orienta esta tesis, la
+interpretabilidad es una propiedad de primer orden: una consulta
+correcta pero no inspectable es difícil de operar de forma confiable.
+Esta consideración refuerza la decisión arquitectónica de adoptar una
+RI explícita y un bucle de verificación auditable.
+
+\section{Síntesis y Brecha de Investigación}
 \label{sec:sota-sintesis}
 
-La revisión organizada en las secciones anteriores permite extraer un
-conjunto de observaciones estructurales que, consideradas en conjunto,
-delimitan el vacío de investigación que motiva la presente tesis.
+En las secciones anteriores se ha analizado la literatura reciente bajo
+una taxonomía multidimensional que cubre el paradigma de aprendizaje, la
+arquitectura del sistema, las estrategias de representación, los
+mecanismos de enriquecimiento contextual, el paradigma de razonamiento y
+las propiedades evaluativas objetivo. La revisión permite extraer cinco
+observaciones de síntesis.
 
-\paragraph{Convergencia hacia la modularidad, con criterios heterogéneos.}
-La gran mayoría de los trabajos revisados abandona la generación monolítica
-\emph{end-to-end} en favor de alguna forma de modularidad, ya sea
-secuencial (\textsc{RESDSQL}, \textsc{DIN-SQL}), multi-agente
-(\textsc{MAC-SQL}, \textsc{OpenSearch-SQL}), o agéntica con búsqueda
-(\textsc{Alpha-SQL}, \textsc{CHASE-SQL}). Sin embargo, los criterios para
-descomponer el problema varían ampliamente, y no existe consenso sobre qué
-garantías estructurales debe proveer cada módulo. En particular, son pocos
-los trabajos que formulan propiedades verificables sobre la representación
-intermedia; con frecuencia, la descomposición se justifica por el
-desempeño empírico sin caracterizar sus invariantes.
+\begin{enumerate}
+    \item \textbf{Migración del aprendizaje al diseño arquitectónico.}
+    Los trabajos más recientes han desplazado el énfasis del
+    \emph{fine-tuning} de extremo a extremo hacia configuraciones
+    \emph{in-context} e híbridas, complementadas con arquitecturas
+    modulares y multiagente. La calidad final del sistema depende cada
+    vez menos del ajuste del modelo base y cada vez más de la
+    orquestación de componentes.
 
-\paragraph{Dualidad persistente entre validez sintáctica y corrección
-semántica.} La decodificación restringida resuelve el problema de la
-validez sintáctica, pero no cierra el ciclo de la corrección semántica. Los
-mecanismos de verificación estática existentes operan típicamente sobre
-plantillas \ac{SQL} genéricas y sobre propiedades básicas del esquema
-relacional. Los mecanismos dinámicos, por su parte, dependen del
-\ac{RDBMS} como oráculo y son costosos a escala. Ninguno de los dos
-regímenes ha sido extendido de manera sistemática a un espacio de consultas
-donde coexistan estructuras relacionales y patrones de grafo.
+    \item \textbf{Predominio de la decodificación libre sobre la
+    representación intermedia.} La mayoría de los sistemas basados en
+    \acp{LLM} prescinde de RI explícita y delega la corrección
+    estructural al generador. Solo una minoría
+    ---IRNet~\cite{IRNet}, NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023},
+    SmBoP~\cite{SmBoP2021}, PICARD~\cite{PICARD2022},
+    SQLFormer~\cite{SQLFormer2023}, SteinerSQL~\cite{SteinerSQL2025}---
+    adopta variantes de RI o decodificación restringida. Esta
+    minoritariedad contrasta con la creciente exigencia de
+    verificabilidad en entornos empresariales.
 
-\paragraph{Fragilidad ante el desplazamiento hacia esquemas empresariales.}
-Los trabajos que evalúan explícitamente sobre \textsc{Spider 2.0} y
-escenarios reales documentan caídas significativas de desempeño respecto
-a los benchmarks cerrados. Esto sugiere que las mejoras reportadas sobre
-\textsc{Spider} y \textsc{BIRD} no se transfieren de forma directa a
-entornos con esquemas masivos, nomenclaturas complejas y datos ruidosos.
-Las propuestas específicamente orientadas a esta problemática
-(\textsc{CRED-SQL}, \textsc{RSL-SQL}, \textsc{CRUSH4SQL}) abordan aspectos
-parciales (recuperación por \emph{clusters}, enlazado bidireccional,
-alucinación controlada de esquema), pero no se integran en un marco común.
+    \item \textbf{Auto-refinamiento sobre texto libre.} La mayoría de
+    los bucles de refinamiento opera sobre la consulta como texto y
+    sobre retroalimentación textual del error de ejecución. Esta
+    granularidad limita la precisión de la corrección y favorece
+    oscilaciones. La retroalimentación estructurada sobre una RI
+    tipada permanece como una vía explorada solo parcialmente.
 
-\paragraph{Tratamiento incipiente de consultas híbridas bajo un estándar
-común.} La formalización del estándar \ac{SQL}/\ac{PGQ}~%
-\cite{ISO9075_16_2023} ofrece un sustrato único para consultas que combinan
-paradigmas relacional y de grafo dentro del mismo entorno. La literatura
-ha explorado separadamente la generación de \ac{SQL} y la generación a
-lenguajes sobre grafos; propuestas como \textsc{STRuCT-LLM}~%
-\cite{STRuCT-LLM2026} y \textsc{BLENDSQL}~\cite{BLENDSQL2025} representan
-pasos hacia la unificación, pero no abordan específicamente el estándar
-híbrido ISO/IEC. La extensión de representaciones intermedias, gramáticas
-restringidas y mecanismos de verificación al dominio dual relacional/grafo
-permanece como un problema abierto.
+    \item \textbf{Schema linking saturado, conocimiento externo
+    incipiente.} El \emph{schema linking} ha recibido atención
+    sostenida y ha alcanzado un grado de madurez considerable. En
+    contraste, la integración con conocimiento externo de dominio
+    ---glosarios, métricas, restricciones de negocio--- sigue siendo
+    una capacidad incipiente, sin formato estandarizado y sin
+    integración nativa con la mayoría de las arquitecturas.
 
-\paragraph{Desatención a propiedades no medibles en benchmarks
-estándar.} Las métricas dominantes reflejan principalmente la corrección
-ejecutiva. Propiedades como la trazabilidad del razonamiento, la
-verificabilidad estructural de la consulta generada, la sensibilidad a
-perturbaciones del esquema y la gobernanza de los datos reciben un
-tratamiento marginal en la literatura, a pesar de ser centrales en
-aplicaciones empresariales~\cite{Data2Decisions, NLinterfaces, SAFENLIDB}.
+    \item \textbf{Cobertura nula de consultas híbridas
+    \ac{SQL}/\ac{PGQ}.} Pese a la formalización del estándar
+    ISO/IEC 9075-16:2023~\cite{ISO9075_16_2023} y a la disponibilidad
+    de motores que lo implementan~\cite{DuckPGQ}, ninguno de los
+    sistemas analizados aborda la generación de consultas híbridas
+    bajo este estándar. STRuCT-LLM~\cite{STRuCT-LLM2026} y
+    text2gqlbench~\cite{text2gqlbench} se aproximan al razonamiento
+    sobre grafos, pero no contemplan la dualidad relacional/grafo
+    propia de \ac{SQL}/\ac{PGQ}. Otros trabajos como
+    SchemaGraphSQL~\cite{SchemaGraphSQL} se sitúan en la frontera, pero
+    sin abordar la generación bajo el estándar híbrido.
+\end{enumerate}
 
-\paragraph{Ubicación de la presente tesis.} Las observaciones anteriores
-convergen en una brecha articulada: \emph{no existe, en la literatura
-revisada, una arquitectura que articule de forma sistemática una
-representación intermedia tipada, un mecanismo de generación restringido
-por gramática y un bucle de verificación estático y dinámico, diseñado
-específicamente para consultas híbridas sobre el estándar} \ac{SQL}/%
-\ac{PGQ}, \emph{con foco en la mitigación de alucinaciones estructurales
-y semánticas en entornos empresariales}. Las piezas individuales existen
-en la literatura; lo que falta es su articulación bajo un marco común que
-extienda las técnicas consolidadas del \emph{text-to-SQL} al dominio dual
-del estándar híbrido. Cerrar esta brecha articulada constituye el
-propósito de la propuesta descrita en el Capítulo~\ref{chap:proposal}.
-
-% =============================================================================
-% Notas de revisión manual
-% =============================================================================
-%
-% 1. SC-Prompt2023 (clave en BibTeX): la entrada combina el título
-%    "SelECT-SQL: Self-correcting ensemble Chain-of-Thought for Text-to-SQL"
-%    con el identificador SC-Prompt. Se mantiene la clave por compatibilidad
-%    con referencias existentes; el título actual refleja el trabajo real.
-%
-% 2. La entrada WrenAI2025 del BibTeX corresponde a un blog técnico no
-%    revisado por pares; se utiliza como fuente industrial y no como
-%    evidencia empírica fuerte.
-%
-% =============================================================================
-
+De la conjunción de estas cinco observaciones se desprende una brecha
+clara. La literatura ha desarrollado de forma extensiva técnicas
+parciales para mitigar alucinaciones en \emph{text-to-SQL}: \emph{schema
+linking}, decodificación restringida, descomposición, auto-refinamiento
+y verificación por ejecución. Sin embargo, no existe en la literatura
+analizada una arquitectura que integre simultáneamente: (i) una RI
+explícita y tipada que cubra tanto el componente relacional como el de
+patrón de grafo del estándar híbrido \ac{SQL}/\ac{PGQ}; (ii) una
+decodificación restringida o composicional sobre dicha RI; (iii) un
+bucle de verificación que opere a nivel de RI con retroalimentación
+estructurada en lugar de texto libre; y (iv) propiedades evaluativas
+que prioricen la interpretabilidad y la robustez junto con la
+corrección. El siguiente capítulo presenta la propuesta de la tesis,
+cuyo objetivo es articular estos cuatro componentes en una arquitectura
+coherente que aborde explícitamente la generación confiable de
+consultas \ac{SQL}/\ac{PGQ} a partir de lenguaje natural.
