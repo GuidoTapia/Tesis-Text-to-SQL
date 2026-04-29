@@ -1,7 +1,4 @@
-% Ejemplo de Bibliografía
-% Recomendado usar Encoding: UTF-8
-% Se sugiere usar Jabref para gestionor sus referencias (obtener los datos correctos a partir de ISBN/ISSN o DOI)
-% Se recomienda que el identificador sea Authoy_Year o Authoryear para facilidad de ver cita en el texto TeX
+
 @techreport{ISO9075_16_2023,
   type = {Standard},
   key = {ISO/IEC 9075-16:2023},
@@ -15,7 +12,7 @@
   url = {https://www.iso.org/standard/79473.html}
 }
 
-@article{STRuCT-LLM2026,
+@article{STRuCT-LLM2025,
   title={STRuCT-LLM: Unifying Tabular and Graph Reasoning with Reinforcement Learning for Semantic Parsing},
   author={Stoisser, Josefa Lia and Martell, Marc Boubnovski and Phillips, Lawrence and Hansen, Casper and Fauqueur, Julien},
   journal={ICLR 2025},
@@ -693,4 +690,138 @@ journal = {Journal of Artificial Intelligence}
   institution={Department of Computer Science, Hong Kong University of Science and Technology},
   number={HKUST-CS98-01},
   year={1998}
+}
+
+@article{liu2024nl2sqlsurvey,
+  author  = {Liu, Xinyu and Shen, Shuyu and Li, Boyan and Ma, Peixian
+             and Jiang, Runzhi and Zhang, Yuyu and Fan, Ju and Li, Guoliang
+             and Tang, Nan and Luo, Yuyu},
+  title   = {A Survey of {NL2SQL} with Large Language Models: Where are we,
+             and where are we going?},
+  journal = {arXiv:2408.05109},
+  year    = {2024}
+}
+
+@article{qin2022recentadvances,
+  author  = {Qin, Bowen and Hui, Binyuan and Wang, Lihan and Yang, Min
+             and Li, Jinyang and Li, Binhua and Geng, Ruiying and Cao, Rongyu
+             and Sun, Jian and Si, Luo and Huang, Fei and Li, Yongbin},
+  title   = {A Survey on Text-to-{SQL} Parsing: Concepts, Methods, and Future
+             Directions},
+  journal = {arXiv:2208.13629},
+  year    = {2022}
+}
+
+@article{hong2024llmtext2sql,
+  author  = {Hong, Zijin and Yuan, Zheng and Zhang, Qinggang and Chen, Hao
+             and Dong, Junnan and Huang, Feiran and Huang, Xiao},
+  title   = {Next-Generation Database Interfaces: A Survey of {LLM}-based
+             Text-to-{SQL}},
+  journal = {arXiv:2406.08426},
+  year    = {2024}
+}
+
+@article{shi2025surveyllmtext2sql,
+  author  = {Shi, Liang and Tang, Zhengju and Zhang, Nan and Zhang, Xiaotong
+             and Yang, Zhi},
+  title   = {A Survey on Employing Large Language Models for Text-to-{SQL}
+             Tasks},
+  journal = {ACM Computing Surveys},
+  year    = {2025},
+  doi     = {10.1145/3737873}
+}
+
+@article{liu2025nli4db,
+  author  = {Liu, Mengyi and Wang, Bo and Chen, Wei and Lan, Tian and Yan, Caicai
+             and Liu, Hao and Hu, Yuting and Yan, Xinkai and Cui, Bin},
+  title   = {{NLI4DB}: A Systematic Review of Natural Language Interfaces
+             for Databases},
+  journal = {arXiv:2503.02435},
+  year    = {2025}
+}
+
+% =============================================================================
+% Representaciones intermedias para semantic parsing
+% =============================================================================
+
+@inproceedings{guo2019irnet,
+  author    = {Guo, Jiaqi and Zhan, Zecheng and Gao, Yan and Xiao, Yan
+               and Lou, Jian-Guang and Liu, Ting and Zhang, Dongmei},
+  title     = {Towards Complex Text-to-{SQL} in Cross-Domain Database
+               with Intermediate Representation},
+  booktitle = {Proc. 57th Annual Meeting of the Association for
+               Computational Linguistics (ACL)},
+  pages     = {4524--4535},
+  year      = {2019},
+  doi       = {10.18653/v1/P19-1444}
+}
+
+@inproceedings{gan2021natsql,
+  author    = {Gan, Yujian and Chen, Xinyun and Xie, Jinxia and Purver, Matthew
+               and Woodward, John R. and Drake, John and Zhang, Qiaofu},
+  title     = {Natural {SQL}: Making {SQL} Easier to Infer from Natural
+               Language Specifications},
+  booktitle = {Findings of EMNLP 2021},
+  pages     = {2030--2042},
+  year      = {2021},
+  doi       = {10.18653/v1/2021.findings-emnlp.174}
+}
+
+@inproceedings{herzig2021unlocking,
+  author    = {Herzig, Jonathan and Shaw, Peter and Chang, Ming-Wei
+               and Guu, Kelvin and Pasupat, Panupong and Zhang, Yuan},
+  title     = {Unlocking Compositional Generalization in Pre-trained
+               Models Using Intermediate Representations},
+  booktitle = {arXiv:2104.07478},
+  year      = {2021}
+}
+
+@inproceedings{nie2022graphqir,
+  author    = {Nie, Lunyiu and Cao, Shulin and Shi, Jiaxin and Sun, Jiuding
+               and Tian, Qi and Hou, Lei and Li, Juanzi and Zhai, Jidong},
+  title     = {{GraphQ IR}: Unifying the Semantic Parsing of Graph Query
+               Languages with One Intermediate Representation},
+  booktitle = {Proc. EMNLP 2022},
+  pages     = {5848--5865},
+  year      = {2022},
+  doi       = {10.18653/v1/2022.emnlp-main.394}
+}
+
+% =============================================================================
+% Lenguajes de consulta sobre grafos y SQL/PGQ (formalismos)
+% =============================================================================
+
+@inproceedings{francis2023gpc,
+  author    = {Francis, Nadime and Gheerbrant, Am{\'e}lie and Guagliardo, Paolo
+               and Libkin, Leonid and Marsault, Victor and Martens, Wim
+               and Murlak, Filip and Peterfreund, Liat and Rogova, Alexandra
+               and Vrgo{\v{c}}, Domagoj},
+  title     = {{GPC}: A Pattern Calculus for Property Graphs},
+  booktitle = {Proc. 42nd ACM SIGMOD-SIGACT-SIGAI Symposium on Principles
+               of Database Systems (PODS)},
+  pages     = {241--250},
+  year      = {2023},
+  doi       = {10.1145/3584372.3588662}
+}
+
+@inproceedings{deutsch2022graph,
+  author    = {Deutsch, Alin and Francis, Nadime and Green, Alastair
+               and Hare, Keith and Li, Bei and Libkin, Leonid and Lindaaker, Tobias
+               and Marsault, Victor and Martens, Wim and Michels, Jan
+               and Murlak, Filip and Plantikow, Stefan and Selmer, Petra
+               and van Rest, Oskar and Voigt, Hannes and Vrgo{\v{c}}, Domagoj
+               and Wu, Mingxi and Zemke, Fred},
+  title     = {Graph Pattern Matching in {GQL} and {SQL/PGQ}},
+  booktitle = {Proc. ACM SIGMOD International Conference on Management of Data},
+  pages     = {2246--2258},
+  year      = {2022},
+  doi       = {10.1145/3514221.3526057}
+}
+
+@article{bonifati2025expressiveness,
+  author  = {Bonifati, Angela and others},
+  title   = {On the Expressiveness of Languages for Querying Property
+             Graphs in Relational Databases},
+  journal = {arXiv:2510.07062},
+  year    = {2025}
 }

@@ -1,9 +1,9 @@
 \chapter{Fundamentos de Generación Text-to-Query y Consultas Híbridas}\label{chap:background}
 
 
-Este capítulo presenta los conceptos necesarios para comprender la propuesta del presente trabajo la cual será desarrollada en el Capítulo~\ref{chap:proposal}. La exposición avanza de manera progresiva, desde los fundamentos de los modelos de lenguaje hasta los mecanismos que permiten controlar y verificar las consultas generadas.
+Este capítulo presenta los conceptos necesarios para comprender la propuesta del presente trabajo, la cual será desarrollada en el Capítulo~\ref{chap:proposal}. La exposición avanza de manera progresiva, desde los fundamentos de los modelos de lenguaje hasta los mecanismos que permiten controlar y verificar las consultas generadas.
 
-En primer lugar, se describen los \acp{LLM}, su forma de generar texto y los tipos de alucinaciones que pueden aparecer en este proceso (Sección~\ref{sec:modelos-lenguaje}). Luego, se revisan los modelos de datos relacional y de grafos de propiedad, así como su integración mediante el estándar \ac{SQL}/\ac{PGQ} (Sección~\ref{sec:modelos-datos}) y se introduce el problema de \emph{semantic parsing} y, dentro de este, la tarea de \emph{text-to-query} (Sección~\ref{sec:semantic-parsing}).
+En primer lugar, se describen los \acp{LLM}, su forma de generar texto y los tipos de desafíos que pueden aparecer en este proceso (Sección~\ref{sec:modelos-lenguaje}). Luego, se revisan los modelos de datos relacional y de grafos de propiedad, así como su integración mediante el estándar \ac{SQL}/\ac{PGQ} (Sección~\ref{sec:modelos-datos}) y se introduce el problema de \emph{semantic parsing} y, dentro de este, la tarea de \emph{text-to-query} (Sección~\ref{sec:semantic-parsing}).
 
 Posteriormente, se explica el papel de una representación intermedia tipada como puente entre la interpretación realizada por el modelo y la generación final de una consulta ejecutable (Sección~\ref{sec:ri}) así como se presentan las gramáticas formales y la decodificación restringida como mecanismos para guiar la salida del \ac{LLM} hacia estructuras válidas (Sección~\ref{sec:decodificacion}). Finalmente, se revisan las formas de verificación estática y dinámica que permiten evaluar la corrección de la consulta generada (Sección~\ref{sec:verificacion}).
 
@@ -12,12 +12,11 @@ El capítulo concluye con una síntesis (Sección~\ref{sec:fundamentos-sintesis}
 \section{Modelos de lenguaje y generación estructurada}
 \label{sec:modelos-lenguaje}
 
-Los \acp{LLM}, o modelos extensos de lenguaje, son modelos basados en arquitecturas \emph{transformer}~\cite{Vaswani2017Attention} y entrenados sobre grandes volúmenes de texto. En los últimos años, estos modelos se han convertido en una base importante para la investigación en tareas de \emph{text-to-query}, esto debido a su capacidad para interpretar preguntas en lenguaje natural y generar respuestas en formatos estructurados.
+Los \acp{LLM}, o modelos extensos de lenguaje, son modelos basados en arquitecturas \emph{transformer}~\cite{Vaswani2017Attention} y entrenados sobre grandes volúmenes de texto, los cuales en los últimos años se han convertido en una base importante para la investigación en el área de \emph{text-to-query} debido a su capacidad para interpretar preguntas en lenguaje natural y poder generar respuestas en formatos estructurados. Esto en adición a su flexibilidad para adaptarse a nuevos esquemas de bases de datos mediante aprendizaje en contexto \cite{Brown2020GPT3} les permite generar consultas sin requerir un reentrenamiento completo del modelo para cada dominio o base de datos. 
 
-Para el desarrollo de esta tesis, su relevancia se entiende a partir de tres aspectos principales: En primer lugar, los \acp{LLM} pueden adaptarse a esquemas que no fueron vistos durante el entrenamiento, especialmente mediante aprendizaje en contexto~\cite{Brown2020GPT3}. Esto permite aplicar el modelo a nuevos dominios sin requerir necesariamente un proceso completo de reentrenamiento. En segundo lugar, el uso de vocabularios basados en \emph{subwords} les permite representar identificadores propios de un esquema, como nombres de tablas, columnas o relaciones, incluso cuando estos no aparecen literalmente en sus datos de entrenamiento. En tercer lugar, la disponibilidad de modelos preentrenados de propósito general permite distintas formas de adaptación, ya sea mediante \emph{fine-tuning}, diseño del \emph{prompt} o una combinación de ambos enfoques.
+Esta capacidad de generalización se complementa con la versatilidad de los modelos preentrenados, los cuales pueden especializarse en la generación de consultas estructuradas mediante \emph{fine-tuning}, diseño avanzado de \emph{prompts} o enfoques híbridos que combinan ambas estrategias.
 
-
-Sin embargo, esta capacidad de generación no resuelve por sí sola el problema de \emph{text-to-query}, ya que los \acp{LLM} generan texto de forma autorregresiva, es decir, producen una secuencia de \emph{tokens} prediciendo cada nuevo elemento a partir de los anteriores. Este proceso está guiado por patrones estadísticos aprendidos durante el entrenamiento, pero no incorpora de manera nativa las reglas gramaticales del lenguaje de consulta ni las restricciones del esquema sobre el cual se debe operar, dando como resultado que el modelo pueda producir consultas que parezcan correctas desde el punto de vista del lenguaje natural, pero que contienen errores estructurales, referencias inexistentes o interpretaciones equivocadas del esquema. Estos errores forman parte de los fenómenos que la literatura denomina \emph{alucinaciones}~\cite{Ji2023Hallucination}. 
+No obstante, esta capacidad no resuelve por sí sola el problema presentado, ya que estos modelos se caracterizan por generar texto de forma autorregresiva, es decir que se produce una secuencia de \emph{tokens} prediciendo cada elemento a partir de los anteriores, siendo este un proceso estadístico, que no incorpora de manera nativa las reglas gramaticales ni el esquema sobre el cual operar, lo que abre la puerta a la posibilidad de producir consultas que parezcan correctas desde el punto de vista del lenguaje natural, pero que contienen errores estructurales, referencias inexistentes o interpretaciones equivocadas de esquema. Fenómeno que en la literatura se conoce como \emph{alucinaciones}~\cite{Ji2023Hallucination}. 
 
 \subsection{Arquitectura transformer y decodificación autorregresiva}
 La arquitectura \emph{transformer}~\cite{Vaswani2017Attention} permite procesar una secuencia de entrada $x = (x_1, \ldots, x_n)$ y representar cada \emph{token} mediante vectores contextualizados. Para ello utiliza mecanismos de atención, los cuales permiten que el modelo relacione distintos elementos de la secuencia, incluso cuando se encuentran alejados entre sí. A diferencia de arquitecturas recurrentes, este procesamiento no depende de recorrer la secuencia paso a paso, sino de comparar los \emph{tokens} entre sí mediante capas de atención.En tareas de \emph{text-to-query}, los \acp{LLM} suelen emplearse como modelos generativos autorregresivos. Esto significa que generan la salida $y = (y_1, \ldots, y_m)$ un \emph{token} a la vez, donde cada nuevo \emph{token} depende de los generados previamente y de la entrada original. Formalmente, esta generación puede expresarse como:\[P(y \mid x) \;=\; \prod_{t=1}^{m} P(y_t \mid y_{<t},\, x),\]donde $P(y_t \mid y_{<t}, x)$ representa la probabilidad del siguiente \emph{token} dado el prefijo ya generado $y_{<t}$ y la entrada $x$. En la práctica, esta probabilidad se obtiene mediante una capa \emph{softmax} sobre el vocabulario del modelo. A partir de esa distribución, el siguiente \emph{token} puede seleccionarse mediante estrategias como la maximización local o el muestreo.Esta forma de generación tiene dos consecuencias importantes para \emph{text-to-query}. En primer lugar, el modelo decide cada paso en función de la probabilidad del siguiente \emph{token}, pero no garantiza por sí mismo que la consulta completa sea válida. Por ejemplo, una elección localmente probable puede introducir el nombre de una columna inexistente o una relación incorrecta entre tablas. En segundo lugar, el espacio de salida del modelo está definido por \emph{tokens}, no por las reglas formales del lenguaje de consulta. Por ello, aunque el modelo pueda producir una secuencia que se parezca a una consulta válida, no existe una garantía nativa de que dicha secuencia respete la gramática del lenguaje ni las restricciones del esquema objetivo.
@@ -27,7 +26,7 @@ La arquitectura \emph{transformer}~\cite{Vaswani2017Attention} permite procesar 
 
 Sobre esta base de generación, la aplicación a tareas específicas admite dos regímenes complementarios. El \emph{fine-tuning} supervisado modifica los parámetros del modelo mediante pares (pregunta, consulta) con el fin de sesgar $P(y \mid x)$ hacia el lenguaje objetivo. El \emph{aprendizaje en contexto}~\cite{Brown2020GPT3}, por su parte, mantiene los parámetros congelados y condiciona la generación en un \emph{prompt} que incluye instrucciones y, opcionalmente, ejemplos de la tarea; en este régimen, la distribución efectiva de generación depende de la composición del \emph{prompt}, no de una actualización del modelo.
 
-Ambos regímenes comparten una limitación estructural: la salida es, en último término, el resultado de un muestreo sobre una distribución que desconoce las restricciones formales del lenguaje de consulta y del esquema. Por ello, el estudio de la fidelidad estructural de la salida requiere mecanismos externos al propio \ac{LLM}.
+Ambos regímenes comparten una limitación estructural clave: la salida es el resultado de un muestreo sobre una distribución que desconoce las restricciones formales del lenguaje de consulta y del esquema. Por ello, el estudio de la fidelidad estructural de la salida requiere mecanismos externos al propio \ac{LLM}.
 
 \section{Modelos de datos y lenguajes de consulta}
 \label{sec:modelos-datos}
@@ -37,17 +36,15 @@ Las consultas estudiadas en esta investigación se formulan sobre dos modelos de
 
 \subsection{Modelo relacional y álgebra relacional}
 
-El modelo relacional~\cite{Codd1970Relational} representa los datos mediante \emph{relaciones}: conjuntos de tuplas de aridad fija, donde cada posición se asocia a un atributo con dominio de valores. Formalmente, una relación $R$ sobre el esquema $(A_1, \ldots, A_k)$ con dominios $(D_1, \ldots, D_k)$ se define como
-\[
-R \;\subseteq\; D_1 \times \cdots \times D_k.
-\]
-Un \emph{esquema relacional} $\mathcal{S}_{\mathrm{rel}}$ es un conjunto finito de tales relaciones, junto con restricciones de integridad: claves primarias, claves foráneas, unicidad y restricciones de dominio.
+El modelo relacional~\cite{Codd1970Relational} representa los datos mediante conjuntos de tuplas de aridad fija, donde cada posición se asocia a un atributo con dominio de valores. A su vez un \emph{esquema relacional} $\mathcal{S}_{\mathrm{rel}}$ agrupa estas relaciones y sus restricciones de integridad, como claves primarias, claves foráneas, restricciones de unicidad y dominios válidos.
 
-Sobre este modelo opera el álgebra relacional, cuyos operadores básicos $\{\sigma, \pi, \bowtie, \cup, -, \rho\}$, que corresponden respectivamente a selección, proyección, unión natural, unión, diferencia y renombramiento, son cerrados sobre el conjunto de relaciones y componen un lenguaje declarativo con expresividad equivalente al cálculo relacional de primer orden con dominio acotado~(\emph{safe range calculus}). Esta equivalencia es metodológicamente relevante: propiedades como la existencia de una columna referenciada o la consistencia de una unión respecto a las claves foráneas admiten formalización como predicados decidibles sobre el álgebra, lo que habilita la verificación estática en tiempo lineal sobre el tamaño de la consulta.
+El álgebra relacional proporciona los operadores formales para consultar este modelo. Entre sus operadores básicos se encuentran la selección $\sigma$, la proyección $\pi$, la unión natural $\bowtie$, la unión $\cup$, la diferencia $-$ y el renombramiento $\rho$. Estos operadores son cerrados sobre relaciones, por lo que sus resultados pueden combinarse nuevamente con otros operadores.
+
+Esta base formal es relevante para esta investigación porque permite razonar sobre una consulta antes de ejecutarla. Por ejemplo, es posible verificar si una columna referenciada existe en el esquema, si una operación respeta las relaciones definidas entre tablas o si una composición de operadores es compatible con las restricciones disponibles. De este modo, el modelo relacional no solo define cómo se estructuran los datos, sino también un marco para validar consultas de forma estática.
 
 \subsection{SQL como lenguaje declarativo}
 
-SQL (\emph{Structured Query Language}), estandarizado en la serie ISO/IEC 9075, es el lenguaje declarativo dominante para consultar bases de datos relacionales. Una consulta en forma \texttt{SELECT-FROM-WHERE-GROUP BY-HAVING-ORDER BY} se corresponde, con matices sintácticos, con una expresión del álgebra relacional extendida con agregaciones y ordenamiento. La distinción entre la consulta declarativa y el plan físico ejecutado por el motor es relevante para esta tesis: el objetivo de la generación es producir una expresión declarativa bien formada y grounded al esquema; la optimización y ejecución son responsabilidad del \ac{RDBMS}.
+SQL (\emph{Structured Query Language}), estandarizado en la serie ISO/IEC 9075, es el lenguaje declarativo dominante para consultar bases de datos relacionales. Una consulta en forma \texttt{SELECT-FROM-WHERE-GROUP BY-HAVING-ORDER BY} se corresponde, con una expresión del álgebra relacional extendida con agregaciones y ordenamiento. La distinción entre la consulta declarativa y el plan físico ejecutado por el motor es relevante para esta tesis: el objetivo de la generación es producir una expresión declarativa bien formada y aterrizada al esquema, en cambio la optimización y ejecución pasan a ser responsabilidad del \ac{RDBMS}.
 
 \subsection{Grafos de propiedad y pattern matching}
 
@@ -55,19 +52,23 @@ Un \emph{grafo de propiedad}~\cite{Angles2017Graph} se define como una estructur
 \[
 G \;=\; (V,\, E,\, \lambda,\, \mathrm{src},\, \mathrm{tgt},\, \mathrm{prop}),
 \]
-donde $V$ es un conjunto finito de vértices, $E$ un conjunto finito de aristas, $\lambda: V \cup E \to 2^{\Sigma_L}$ asigna a cada elemento un conjunto de etiquetas de un alfabeto $\Sigma_L$, $\mathrm{src}, \mathrm{tgt}: E \to V$ determinan los extremos de cada arista dirigida, y $\mathrm{prop}: (V \cup E) \times K \rightharpoonup D$ asocia a cada elemento y cada clave $k \in K$ un valor parcial en un dominio $D$.
+donde $V$ es un conjunto finito de vértices, $E$ un conjunto finito de aristas, $\lambda: V \cup E \to 2^{\Sigma_L}$ asigna a cada elemento un conjunto de etiquetas de un alfabeto, $\Sigma_L$, $\mathrm{src}, \mathrm{tgt}: E \to V$ determinan los extremos de cada arista dirigida, y $\mathrm{prop}: (V \cup E) \times K \rightharpoonup D$ asocia a cada elemento y cada clave $k \in K$ un valor parcial en un dominio $D$.
 
-El lenguaje de consulta natural sobre esta estructura es el \emph{pattern matching}: una consulta se expresa como un patrón $P$, esto es, un grafo con variables en lugar de identificadores, y el resultado es el conjunto de homomorfismos de $P$ en $G$ compatibles con las etiquetas y con las restricciones declaradas sobre las propiedades. Como ilustración mínima, sobre un grafo en el que los vértices llevan la etiqueta \texttt{Person} y las aristas la etiqueta \texttt{KNOWS}, el patrón
-\[
-(p_1{:}\mathtt{Person}) \xrightarrow{\,\mathtt{KNOWS}\,} (p_2{:}\mathtt{Person}) \xrightarrow{\,\mathtt{KNOWS}\,} (p_3{:}\mathtt{Person})
-\]
-denota la consulta ``personas conectadas por dos saltos de \texttt{KNOWS}''; cada homomorfismo de este patrón en $G$ instancia las variables $p_1, p_2, p_3$ en vértices concretos y se proyecta como una tupla del resultado.
+La forma natural de consultar esta estructura es mediante \emph{pattern matching}. En lugar de describir una consulta como una combinación de tablas, se define un patrón $P$ que debe encontrarse dentro del grafo. Dicho patrón contiene variables, etiquetas y restricciones sobre propiedades. El resultado de la consulta corresponde a las coincidencias entre el patrón y el grafo, es decir, a las asignaciones de sus variables a vértices y aristas concretas que respetan las etiquetas y condiciones declaradas.
 
-Una clase particularmente estudiada son las \emph{regular path queries} (\acp{RPQ}), que especifican caminos mediante expresiones regulares sobre el alfabeto $\Sigma_L$; generalizan las consultas de vecindad y admiten evaluación en tiempo polinomial mediante construcciones basadas en autómatas~\cite{Angles2017Graph}. Esta formalización permite, a efectos de verificación, formular reglas de tipado análogas a las del modelo relacional: toda referencia en una consulta sobre grafos debe corresponder a una etiqueta, un tipo o una propiedad declarada en la especificación de $G$.
+Dentro de este tipo de consultas, una clase importante son las \emph{regular path queries} (\acp{RPQ}), que permiten describir caminos mediante expresiones regulares sobre las etiquetas de las aristas. Estas consultas generalizan las búsquedas de vecindad, ya que no solo permiten consultar relaciones directas, sino también trayectorias de longitud variable que siguen una secuencia determinada de etiquetas~\cite{Angles2017Graph}.
+
+Esta formalización es relevante para la verificación de consultas sobre grafos ya que permiten formular reglas de tipado análogas a las del modelo relacional: toda referencia en una consulta sobre grafos debe corresponder a una etiqueta, un tipo o una propiedad declarada en la especificación de $G$.
 
 \subsection{El estándar SQL/PGQ como integración}
 
-El estándar ISO/IEC 9075-16:2023~\cite{ISO9075_16_2023} introduce \ac{SQL}/\ac{PGQ} como extensión de SQL para consultar grafos de propiedad definidos sobre tablas relacionales existentes. Su construcción fundamental es la expresión \texttt{GRAPH\_TABLE(graph MATCH pattern COLUMNS (...))}, que produce una relación derivada a partir de un patrón de grafo y admite composición directa con las cláusulas relacionales clásicas. La integración es conceptualmente significativa por dos razones. Primera, unifica dos modelos de datos formalmente distintos bajo un único lenguaje, con lo cual el problema de la generación \emph{text-to-query} debe abarcar, simultáneamente, el álgebra relacional y el \emph{pattern matching} sobre grafos. Segunda, introduce una nueva categoría de consistencia estructural: la coherencia entre los componentes relacional y de grafo de una misma consulta, que no se reduce a la validez de cada componente por separado.
+El estándar ISO/IEC 9075-16:2023~\cite{ISO9075_16_2023} introduce \ac{SQL}/\ac{PGQ} como una extensión de SQL orientada a la consulta de grafos de propiedad definidos sobre tablas relacionales existentes. Como su construcción principal tenemos la expresión:
+\[ \texttt{GRAPH\_TABLE(graph MATCH pattern COLUMNS (...))} \]
+La cual evalua un patrón de grafo y devuelve una relación derivada que puede usarse en conjunto con las cláusulas tradicionales de SQL. 
+
+Esta integración resulta relevante dado que une dos formas distintas de representar y consultar datos mantieniendo, por un lado, el modelo relacional (basado en tablas, atributos y restricciones); e integrandolo con el modelo de grafos de propiedad (expresado mediante patrones de vértices, aristas, etiquetas y propiedades).
+
+Esta combinación introduce un reto adicional en el campo investigado ya que no solo se debe generar consultas SQL válidas, sino también patrones de grafo coherentes, así como se debe preservar la consistencia entre ambos niveles. Es por esto que una consulta SQL/PGQ no puede validarse únicamente revisando cada componente por separado, sino que también es necesario verificar que la interacción entre ambos sea estructural y semánticamente correcta.
 
 \section{Semantic parsing y generación \emph{text-to-query}}
 \label{sec:semantic-parsing}
@@ -76,11 +77,11 @@ El estándar ISO/IEC 9075-16:2023~\cite{ISO9075_16_2023} introduce \ac{SQL}/\ac{
 
 El \emph{semantic parsing}~\cite{ZelleMooney1996} es la tarea de transformar un enunciado en lenguaje natural $u$ en una representación formal $z$ que pueda ser ejecutada sobre un entorno $\mathcal{E}$. Este entorno puede ser, por ejemplo, una base de datos, un grafo de conocimiento o incluso un sistema físico. El objetivo es que la ejecución de dicha representación formal, denotada como $\llbracket z \rrbracket_{\mathcal{E}}$, produzca la respuesta esperada para la pregunta original.
 
-La representación formal $z$ puede adoptar distintas formas, dependiendo del dominio y del tipo de sistema. Puede tratarse de expresiones en $\lambda$-cálculo, lenguajes específicos de dominio, consultas SQL, consultas sobre grafos como \emph{Cypher}, entre otros. En términos generales, el problema requiere relacionar tres componentes: el enunciado en lenguaje natural, el entorno sobre el cual se ejecutará la consulta y el mecanismo que traduce el primero en una representación formal válida.
+La representación formal $z$ puede adoptar distintas formas, dependiendo del dominio y del tipo de sistema. Por ejemplo, puede tratarse de expresiones en cálculo, lenguajes específicos de dominio, consultas SQL, consultas sobre grafos como \emph{Cypher}, entre otros. Sea cual sea el caso, este problema requiere relacionar tres componentes: el enunciado en lenguaje natural, el entorno sobre el cual se ejecutará la consulta y el mecanismo que traduce el primero en una representación formal válida.
 
 \subsection{\emph{Text-to-SQL} como caso particular y extensión a \emph{text-to-query}}
 
-La tarea \emph{text-to-SQL} es un caso particular de \emph{semantic parsing}. En este caso, la representación formal pertenece al lenguaje SQL y el entorno de ejecución es una base de datos relacional con un esquema $\mathcal{S}_{\mathrm{rel}}$. La entrada del sistema puede expresarse como el par $(u, \mathcal{S}_{\mathrm{rel}})$, donde $u$ es la pregunta en lenguaje natural y $\mathcal{S}_{\mathrm{rel}}$ es el esquema de la base de datos. La salida esperada es una consulta $q$ que, al ejecutarse sobre la base de datos, produzca la respuesta correcta.
+La tarea \emph{text-to-SQL} es un caso particular de \emph{semantic parsing}. En este caso, la representación formal pertenece al lenguaje SQL y el entorno de ejecución es una base de datos relacional. La entrada del sistema puede expresarse como el par $(u, \mathcal{S}_{\mathrm{rel}})$, donde $u$ es la pregunta en lenguaje natural y $\mathcal{S}_{\mathrm{rel}}$ es el esquema de la base de datos. La salida esperada es una consulta $q$ que, al ejecutarse sobre la base de datos, produzca la respuesta correcta.
 
 La presente tesis aborda una extensión de este problema hacia \emph{text-to-query} sobre \ac{SQL}/\ac{PGQ}. En este escenario, la consulta no se limita únicamente a operaciones relacionales, sino que también puede incluir patrones de grafo y combinaciones entre ambos modelos. Por ello, la entrada se define como un par $(u, \mathcal{S})$, donde $\mathcal{S}$ representa un esquema dual:
 
@@ -89,22 +90,6 @@ La presente tesis aborda una extensión de este problema hacia \emph{text-to-que
 \]
 
 Aquí, $\mathcal{S}_{\mathrm{rel}}$ corresponde al componente relacional, mientras que $\mathcal{S}_{\mathrm{grafo}}$ describe el componente de grafo de propiedad. La salida esperada es una consulta capaz de combinar operadores SQL tradicionales con patrones de grafo definidos bajo \ac{SQL}/\ac{PGQ}.
-
-\subsection{\emph{Schema linking} y \emph{grounding} al esquema}
-
-Una subtarea central en los sistemas \emph{text-to-query} es el \emph{schema linking}. Esta consiste en identificar qué elementos del esquema son mencionados, directa o indirectamente, en la pregunta del usuario. Dichos elementos pueden ser tablas, columnas, relaciones, etiquetas de vértices, tipos de aristas o propiedades del grafo.
-
-Formalmente, esta correspondencia puede representarse mediante una función:
-
-\[
-\ell: \mathrm{menciones}(u) \to 2^{\mathcal{S}},
-\]
-
-donde cada mención del enunciado $u$ se asocia con un subconjunto de elementos del esquema $\mathcal{S}$ que podrían corresponder a dicha mención.
-
-El \emph{grounding} al esquema se refiere a la propiedad de que toda referencia utilizada en la consulta generada debe estar vinculada a un elemento existente y relevante del esquema. En otras palabras, la consulta no debería introducir tablas, columnas, etiquetas, aristas o propiedades que no estén definidas en $\mathcal{S}$ o que no hayan sido identificadas como pertinentes para la pregunta.
-
-Cuando este proceso falla, aparecen alucinaciones referenciales, como se describió en la Sección~\ref{subsec:alucinaciones}. Por esta razón, un sistema orientado a reducir este tipo de errores debe incorporar mecanismos explícitos de \emph{grounding}. En la práctica, esto suele realizarse mediante una fase previa a la generación, en la que se seleccionan y organizan los elementos del esquema que serán considerados por el modelo.
 
 \section{Representaciones intermedias}
 \label{sec:ri}
@@ -115,69 +100,37 @@ Una \emph{representación intermedia} (\ac{RI}) es un lenguaje formal $\mathcal{
 \[
 \kappa: \mathcal{L}_{\mathrm{RI}} \to \mathcal{L}_{\mathrm{objetivo}}
 \]
-hacia el lenguaje de consulta efectivo, que en esta tesis es \ac{SQL}/\ac{PGQ}. Su rol en un pipeline de generación es mediar entre la salida del componente estadístico y la consulta ejecutable: el modelo produce, o es guiado a producir, instancias bien tipadas de $\mathcal{L}_{\mathrm{RI}}$; el compilador $\kappa$ genera determinísticamente la consulta final.
+hacia el lenguaje de consulta efectivo. Su rol en un pipeline de generación es mediar entre la salida del componente estadístico y la consulta ejecutable: el modelo produce, o es guiado a producir, instancias bien tipadas de $\mathcal{L}_{\mathrm{RI}}$; el compilador $\kappa$ genera determinísticamente la consulta final.
 
 \subsection{Propiedades deseables}
 
-Una \ac{RI} adecuada para \emph{text-to-query} satisface, idealmente, las siguientes propiedades:
+Una \ac{RI} adecuada para \emph{text-to-query} satisface, idealmente, las siguientes propiedades, identificadas a partir de los diseños de \acp{RI} previas para parsing semántico \cite{guo2019irnet,gan2021natsql,herzig2021unlocking,nie2022graphqir} y de la formalización de los lenguajes objetivo \cite{francis2023gpc,deutsch2022graph}:
 
 \begin{description}
-    \item[Abstracción sintáctica.] $\mathcal{L}_{\mathrm{RI}}$ suprime decisiones sintácticas irrelevantes del lenguaje objetivo, tales como los alias, el orden de cláusulas o la elección entre \texttt{JOIN} y subconsulta. Dos consultas objetivo semánticamente equivalentes admiten, idealmente, una única representación en $\mathcal{L}_{\mathrm{RI}}$.
-    \item[Tipado decidible.] La corrección estructural de una instancia se decide mediante reglas locales, sin ejecutar la consulta. Cada nodo declara los tipos de sus operandos, y las reglas de tipado se verifican composicionalmente.
-    \item[Compilación determinista.] $\kappa$ es una función total sobre instancias bien tipadas y produce la misma salida para instancias estructuralmente idénticas. Esto aísla la indeterminación del modelo en el espacio de $\mathcal{L}_{\mathrm{RI}}$.
-    \item[Expresividad adecuada.] $\mathcal{L}_{\mathrm{RI}}$ cubre las construcciones del lenguaje objetivo relevantes para la tarea. En \ac{SQL}/\ac{PGQ}, esto exige soporte para operadores relacionales, patrones de grafo y su composición híbrida.
+\item[Abstracción sintáctica.] $\mathcal{L}_{\mathrm{RI}}$ suprime decisiones sintácticas del lenguaje objetivo que no tienen contraparte directa en la formulación en lenguaje natural, tales como alias, el orden de cláusulas, la elección entre \texttt{JOIN} y subconsulta, o la presencia explícita de \texttt{FROM}, \texttt{GROUP BY} y \texttt{HAVING}. La motivación sigue la línea de SemQL \cite{guo2019irnet} y, más radicalmente, NatSQL \cite{gan2021natsql}, que prescinden de operadores y cláusulas SQL ``raramente encontradas en las descripciones del usuario''. Como consecuencia, consultas objetivo semánticamente equivalentes tienden a colapsar en una representación canónica en $\mathcal{L}_{\mathrm{RI}}$, reduciendo el espacio de salida que el modelo debe predecir.
+
+\item[Tipado composicional.] La buena formación de una instancia se decide mediante un sistema de tipos estático: cada constructor declara los tipos de sus operandos y el tipo del término resultante se deriva de los de sus subtérminos. Esta propiedad sigue la tradición de los cálculos formales para lenguajes de consulta de grafos, en particular GPC \cite{francis2023gpc}, donde un conjunto de reglas de tipado garantiza que toda expresión bien tipada admite un esquema $\mathrm{sch}(\xi)$ derivable composicionalmente. El tipado opera puramente sobre la estructura de la \ac{RI} y el esquema de la base de datos, sin requerir evaluación.
+
+\item[Compilación dirigida por sintaxis.] La función de compilación $\kappa : \mathcal{L}_{\mathrm{RI}} \times \mathcal{S} \rightarrow \mathcal{L}_{\mathrm{obj}}$, donde $\mathcal{S}$ es el esquema, es total sobre instancias bien tipadas y se define por inducción estructural sobre la \ac{RI}. La indeterminación propia de la generación neuronal queda así confinada al espacio $\mathcal{L}_{\mathrm{RI}}$, en línea con el principio de \emph{deterministic inference} de IRNet \cite{guo2019irnet} y con la separación entre parser semántico y compilador \emph{source-to-source} adoptada por GraphQ IR \cite{nie2022graphqir}. La dependencia explícita del esquema es necesaria porque parte de la información elidida en la \ac{RI} (e.g.\ inferencia de \texttt{GROUP BY}, resolución de claves foráneas para \texttt{JOIN}) se reconstruye consultando $\mathcal{S}$.
+
+\item[Expresividad adecuada.] $\mathcal{L}_{\mathrm{RI}}$ debe cubrir las construcciones del lenguaje objetivo que aparecen en la distribución de tareas considerada. Para SQL/PGQ \cite{deutsch2022graph}, esto exige soporte simultáneo para las tres capas conceptuales del estándar \cite{bonifati2025expressiveness}: (i) emparejamiento de patrones de grafo, (ii) operadores del álgebra relacional, y (iii) composición híbrida mediante \texttt{GRAPH\_TABLE}. Las \acp{RI} existentes cubren parcialmente alguno de estos fragmentos, como podrían ser SemQL/NatSQL para SQL relacional \cite{guo2019irnet,gan2021natsql}y GraphQ IR para Cypher/SPARQL/KoPL \cite{nie2022graphqir}; pero, hasta donde pudo verificarse, no existe una \ac{RI} que cubra el fragmento híbrido relacional-grafo de SQL/PGQ.
 \end{description}
-
-\subsection{Separación entre generación estadística y compilación determinista}
-
-La introducción de una \ac{RI} permite separar, en el pipeline, la generación estadística, que produce hipótesis de interpretación, de la compilación determinista, que produce la consulta ejecutable. Esta separación es metodológicamente relevante: las alucinaciones del modelo quedan confinadas al espacio de $\mathcal{L}_{\mathrm{RI}}$ y se detectan mediante verificación de tipado antes de que alcancen el motor de ejecución. La propuesta del Capítulo~\ref{chap:proposal} instancia esta idea con una \ac{RI} específica para consultas híbridas \ac{SQL}/\ac{PGQ}.
-
-\section{Gramáticas formales y decodificación restringida}
-\label{sec:decodificacion}
-
-\subsection{Gramáticas formales y jerarquía de Chomsky}
-
-Una gramática formal~\cite{Chomsky1956Three} se define como una tupla $\mathcal{G} = (N, \Sigma, P, S)$, donde $N$ es un conjunto finito de símbolos no terminales, $\Sigma$ un alfabeto de terminales, $P$ un conjunto de producciones y $S \in N$ el símbolo inicial. Los lenguajes de consulta de interés para esta tesis pertenecen, en su núcleo sintáctico, a la clase libre de contexto: tanto SQL como \ac{SQL}/\ac{PGQ} admiten descripciones mediante gramáticas libres de contexto. La correspondencia entre un identificador y su declaración en el esquema, en cambio, no es decidible por la gramática y requiere un análisis adicional sobre el contexto de tipos. Esta separación entre validez gramatical y validez referencial motiva la combinación de decodificación restringida por gramática con verificación por tipos, descritas a continuación.
-
-La teoría del parsing~\cite{Aho2006Compilers} distingue entre estrategias \emph{top-down} (análisis descendente, típicamente $LL$) y \emph{bottom-up} (análisis ascendente, típicamente $LR$). Para el propósito de esta tesis, la propiedad relevante no es el tipo específico de parser, sino la posibilidad de realizar \emph{parsing incremental}: validar un prefijo parcial de la secuencia de salida contra la gramática mientras la generación está en curso.
-
-\subsection{Decodificación restringida como acoplamiento generación–parser}
-
-La decodificación restringida acopla el proceso autorregresivo de un \ac{LLM} a un parser incremental de $\mathcal{G}$. En cada paso $t$, el parser mantiene el conjunto $C_t \subseteq \Sigma$ de \emph{tokens} que extienden el prefijo $y_{<t}$ sin violar la gramática, y la distribución de salida del modelo se restringe a $C_t$:
-\[
-\tilde{P}(y_t \mid y_{<t},\, x) \;\propto\; P(y_t \mid y_{<t},\, x) \cdot \mathbb{1}[\, y_t \in C_t \,].
-\]
-Bajo esta restricción, toda secuencia generada es, por construcción, sintácticamente válida respecto a $\mathcal{G}$. La propiedad es estructural, no estadística: no depende de la calidad del modelo. Sin embargo, la decodificación restringida no garantiza \emph{grounding}: una secuencia puede ser sintácticamente válida y, al mismo tiempo, referenciar identificadores ausentes del esquema, lo que motiva la introducción de mecanismos de verificación complementarios.
-
-\subsection{Sistemas de tipos y reglas locales de validación}
-
-Un sistema de tipos~\cite{Pierce2002Types} añade a una gramática un conjunto de reglas de inferencia que determinan cuándo una expresión está bien tipada. Las reglas se expresan como juicios de la forma $\Gamma \vdash e : \tau$, que se leen: ``bajo el contexto $\Gamma$, la expresión $e$ tiene tipo $\tau$''. Un ejemplo canónico es la regla de aplicación:
-\[
-\frac{\Gamma \vdash f : \tau_1 \to \tau_2 \qquad \Gamma \vdash a : \tau_1}{\Gamma \vdash f(a) : \tau_2}.
-\]
-Aplicado a una \ac{RI} para \emph{text-to-query}, el contexto $\Gamma$ codifica el esquema dual $(\mathcal{S}_{\mathrm{rel}}, \mathcal{S}_{\mathrm{grafo}})$, y las reglas de tipado expresan propiedades como: toda referencia a una columna debe corresponder a una tabla del contexto; toda proyección de propiedad debe apuntar a un tipo de vértice o arista declarado; la unión de dos bloques relacionales exige esquemas compatibles. La decidibilidad local de las reglas las hace adecuadas para verificación estática en tiempo lineal sobre el tamaño de la \ac{RI}.
-
-\subsection{Alcance y límites formales}
-
-Las técnicas de decodificación restringida y verificación por tipos presentan un alcance preciso y límites igualmente precisos. Garantizan la validez sintáctica y la consistencia referencial, pero no deciden, en general, la fidelidad semántica de la consulta respecto a la intención del usuario, ya que esta última no admite especificación formal previa. La estrategia global de una arquitectura robusta consiste, entonces, en combinar estas garantías formales con mecanismos de verificación dinámica, que se describen en la sección siguiente.
 
 \section{Verificación de consultas generadas}
 \label{sec:verificacion}
 
+Si bien el objetivo es la producción de una cadena de consulta, el proceso de \emph{text-to-query} no termina ahí, ya que es necesario evaluar si la consulta generada es consistente con el esquema, si puede ejecutarse correctamente y si su comportamiento es coherente frente a la pregunta original, a este proceso le denominamos verificación y en esta sección detallaremos tres niveles y como se aplican al problema investigado.
+
 \subsection{Verificación estática}
 
-La verificación estática designa el análisis de una consulta, o de su \ac{RI}, sin ejecutarla, mediante la aplicación de reglas decidibles sobre su estructura y sobre el esquema. En el contexto de \emph{text-to-query}, los chequeos estáticos relevantes incluyen: existencia de tablas, columnas, etiquetas y propiedades referenciadas; consistencia de tipos en operadores y condiciones; satisfacibilidad trivial de restricciones, como detección de condiciones contradictorias evidentes; y, en consultas híbridas, coherencia entre los componentes relacional y de grafo.
+La verificación estática designa el análisis de una consulta, o de su \ac{RI}, sin ejecutarla, mediante la aplicación de reglas sobre su estructura y el esquema. En el contexto de \emph{text-to-query}, los chequeos estáticos relevantes incluyen: existencia de tablas, columnas, etiquetas y propiedades referenciadas; consistencia de tipos en operadores y condiciones; satisfacibilidad trivial de restricciones, como detección de condiciones contradictorias evidentes; y, en consultas híbridas, coherencia entre los componentes relacional y de grafo.
 
 Formalmente, la verificación estática puede modelarse como un conjunto de predicados $\Phi = \{\varphi_1, \ldots, \varphi_k\}$ sobre consultas y esquemas. Una consulta $q$ se considera \emph{estáticamente válida} respecto a un esquema $\mathcal{S}$ si se cumple $\bigwedge_{i=1}^{k} \varphi_i(q,\, \mathcal{S})$. La decidibilidad local de cada $\varphi_i$ hace de la verificación estática un mecanismo de costo constante o lineal respecto al tamaño de $q$, y por ello resulta aplicable en un bucle de refinamiento sin comprometer la eficiencia global.
 
-\subsection{Verificación dinámica y oráculos parciales}
+\subsection{Verificación dinámica}
 
 La verificación dinámica ejecuta la consulta en un entorno controlado y analiza la respuesta del motor. El motor actúa como \emph{oráculo parcial}: distingue consultas sintáctica y referencialmente válidas de aquellas que disparan errores de ejecución, pero no decide, en general, la corrección semántica de una consulta ejecutable. Las señales útiles en este régimen incluyen los errores tipados del motor, la cardinalidad anómala del resultado, entendida como un resultado vacío cuando se espera contenido o viceversa, la presencia inesperada de valores nulos y las desviaciones respecto a respuestas de referencia cuando estas existen.
 
 \subsection{Testing metamórfico}
 
-El \emph{testing metamórfico}~\cite{ChenTY1998Metamorphic} extiende la verificación dinámica más allá de los oráculos explícitos. La idea central consiste en identificar relaciones entre entradas y salidas que deben preservarse bajo transformaciones conocidas, denominadas \emph{relaciones metamórficas}. En \emph{text-to-query}, relaciones como la invariancia del resultado bajo renombramiento de alias, la inclusión del resultado de una consulta con \texttt{LIMIT} en el de la misma consulta sin dicha cláusula, o la preservación de cardinalidades bajo reformulaciones semánticamente equivalentes, ofrecen un mecanismo para detectar inconsistencias sin conocer de antemano la respuesta correcta. La violación de una relación metamórfica evidencia un error; su satisfacción, sin embargo, no certifica corrección, sino que acota el espacio de hipótesis de error.
-
-\subsection{Bucles de refinamiento}
-
-Un bucle de refinamiento combina las verificaciones anteriores en un proceso iterativo: una consulta que falla una verificación produce una señal estructurada que se retroalimenta al generador para intentar producir una consulta corregida. El diseño del bucle está gobernado por dos decisiones. La primera es la política de retroalimentación, que determina qué información derivada del fallo se entrega al generador y en qué forma: mensaje crudo del motor, descriptor categórico o sugerencia estructurada. La segunda es el criterio de terminación, que limita el número de iteraciones y decide cuándo declarar la pregunta intrínsecamente ambigua o no resoluble bajo el contexto disponible.
+El \emph{testing metamórfico}~\cite{ChenTY1998Metamorphic} extiende la verificación dinámica más allá de lo explícito. La idea central consiste en identificar relaciones entre entradas y salidas que deben preservarse bajo transformaciones conocidas, denominadas \emph{relaciones metamórficas}. En \emph{text-to-query}, relaciones como la invariancia del resultado bajo renombramiento de alias, la inclusión del resultado de una consulta con \texttt{LIMIT} en el de la misma consulta sin dicha cláusula, o la preservación de cardinalidades bajo reformulaciones semánticamente equivalentes, ofrecen un mecanismo para detectar inconsistencias sin conocer de antemano la respuesta correcta. La violación de una relación metamórfica evidencia un error; su satisfacción, sin embargo, no certifica corrección, sino que acota el espacio de hipótesis de error.
