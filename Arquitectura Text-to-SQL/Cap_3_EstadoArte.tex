@@ -8,17 +8,13 @@ Esta revisión no se plantea como una lista cronológica de trabajos, sino como 
 
 Por ello, este capítulo adopta una taxonomía multidimensional para analizar la literatura de manera más ordenada.
 
-
-
-
-
 \section{Marco taxonómico del análisis}
 \label{sec:sota-taxonomia}
 
 Resolver el problema \emph{text-to-query} obliga a considerar simultáneamente decisiones de: aprendizaje, orquestación arquitectónica, representación, enriquecimiento contextual y criterios de verificación. Estas decisiones operan en diferentes niveles y etapas, incluyendo combinaciones muy variadas en la literatura \cite{hong2024llmtext2sql,shi2025surveyllmtext2sql,liu2025nli4db}. 
 
 En base a esta complejidad y vacio identificado es que se desarrolló una taxonomía con seis dimensiones ortogonales para clasificar los sistemas \emph{text-to-query}. La taxonomía presentada fue elaborada recogiendo y reorganizando ejes ya presentes en surveys recientes \cite{hong2024llmtext2sql,liu2024nl2sqlsurvey,shi2025surveyllmtext2sql,qin2022recentadvances},
-y añadiendo dos contribuciones específicas, producto de la revisión de literatura y de los patrones observados: separar el \emph{paradigma de razonamiento} y las \emph{propiedades evaluativas objetivo} como dimensiones independientes, esto sin descuidar la ortogonalidad entre las dimensiones, de forma tal que un mismo trabajo pueda recibir etiquetas múltiples sin ambigüedad ni superposición entre estas.
+y añadiendo dos contribuciones específicas, producto de la revisión de literatura y de los patrones observados: separar el \emph{paradigma de razonamiento} y las \emph{propiedades de evaluación} como dimensiones independientes, esto sin descuidar la ortogonalidad entre las dimensiones, de forma tal que un mismo trabajo pueda recibir etiquetas múltiples sin ambigüedad ni superposición entre estas.
 
 \begin{figure}[h]
     \centering
@@ -35,30 +31,31 @@ cuya descripción y justificación se resumen a continuación:
 \begin{enumerate}
     \item \textbf{Paradigma de aprendizaje:} Abarca cómo se adapta el modelo base a la tarea, ya sea con parámetros congelados (\emph{zero-shot}, \emph{few-shot} estático o con recuperación dinámica), parámetros ajustados (\emph{fine-tuning}, preentrenamiento continuo, aprendizaje multi-tarea o por refuerzo) o estrategias híbridas. Esta dimensión ayuda a determinar el costo de adaptación, la dependencia de datos anotados y la complejidad de transferencia a nuevos dominios.
 
-    \item \textbf{Arquitectura del sistema:} La distribución de la ejecución entre invocaciones del modelo y módulos auxiliares, distinguiendo configuraciones monolíticas, \emph{pipelines} modulares, multiagente, \emph{agentic-search} y generación con reordenamiento. Es relevante porque condiciona la inspección de etapas intermedias y la intervención sobre componentes específicos.
+    \item \textbf{Arquitectura del sistema:} La distribución de la ejecución entre el modelo y los diferentes módulos auxiliares, distinguiendo configuraciones monolíticas, \emph{pipelines} modulares, multiagente, \emph{agentic-search} y generación con reordenamiento.
 
-    \item \textbf{Representación:} qué estructuras median entre la pregunta y la consulta final, considerando codificación de la entrada, representación intermedia ---ausente, implícita en el esquema, lenguaje dedicado, plan, árbol o descomposición declarativa--- y estrategia de decodificación ---libre, restringida por gramática, composicional o por compilación de la \ac{RI}---. Se considera porque define qué alucinaciones son detectables antes de la consulta final y dónde puede aplicarse verificación estructural.
+    \item \textbf{Representación:} Las estructuras que median entre la pregunta y la consulta final, considerando codificación de la entrada, representación intermedia y estrategia de decodificación.
 
-    \item \textbf{Mecanismos de enriquecimiento contextual:} qué información adicional ancla la salida al esquema y al dominio, mediante \emph{schema linking}, recuperación de contenido de la base de datos, conocimiento externo o ciclos de auto-refinamiento. Se trata como dimensión propia porque su efecto sobre la corrección actúa de forma transversal a la arquitectura y al paradigma de aprendizaje.
+    \item \textbf{Mecanismos de enriquecimiento contextual:} La información adicional que ancla la salida al esquema y al dominio, incluyendo \emph{schema linking}, recuperación de contenido de la base de datos, conocimiento externo o ciclos de auto-refinamiento. Se trata como dimensión propia porque su efecto sobre la corrección actúa de forma transversal a la arquitectura y al paradigma de aprendizaje.
 
-    \item \textbf{Paradigma de razonamiento:} cómo se estructura la inferencia que conduce a la consulta, en variantes directa, en cadena de pensamiento, descompositiva, de múltiples caminos o de retroalimentación iterativa. Se separa de la arquitectura porque una misma organización del \emph{pipeline} admite distintos modos de razonamiento estructural y, por lo tanto, distintos perfiles de auditabilidad.
+    \item \textbf{Paradigma de razonamiento:} Cómo se estructura la inferencia que lleva a la consulta, en variantes directa, en cadena de pensamiento, descompositiva, de múltiples caminos o de retroalimentación iterativa.
 
-    \item \textbf{Propiedades evaluativas objetivo:} qué propiedades del sistema prioriza explícitamente cada trabajo, entre corrección, eficiencia, robustez, adaptabilidad, escalabilidad e interpretabilidad. Se incorpora como eje independiente para hacer visible el sesgo dominante hacia la corrección y permitir comparaciones sobre propiedades críticas en consultas empresariales.
+    \item \textbf{Evaluación:} Las propiedades del sistema que prioriza explícitamente cada trabajo, entre corrección, eficiencia, robustez, adaptabilidad, escalabilidad e interpretabilidad. Se incorpora como eje independiente para hacer visible el sesgo dominante hacia la corrección y permitir comparaciones sobre propiedades críticas en consultas empresariales.
 \end{enumerate}
 
-A partir de esta categorización, las secciones siguientes revisan la
-literatura reciente analizando, por dimensión, cómo se han posicionado los
-trabajos representativos. La revisión se concentra en propuestas publicadas
-mayoritariamente entre 2017 y 2026, abarcando desde los primeros sistemas
-neuronales basados en codificadores especializados hasta las arquitecturas
-multiagente más recientes sustentadas en \acp{LLM}. Cada sección cierra con
-una observación crítica que identifica patrones, limitaciones y vacíos
-relevantes para la presente investigación.
+A partir de esta categorización, las siguientes secciones revisarán la literatura reciente analizando, por dimensión, cómo se han posicionado los trabajos más representativos, enfocándose en propuestas publicadas mayoritariamente entre 2017 y 2026, abarcando de esta forma, desde los primeros sistemas neuronales basados en codificadores especializados hasta las arquitecturas multiagente más recientes.
 
 \section{Paradigma de aprendizaje}
 \label{sec:sota-d1-aprendizaje}
 
-Esta sección analiza la forma en que los sistemas \emph{text-to-query} adaptan su modelo base a la tarea. Aunque la mayoría de los trabajos revisados utiliza \acp{LLM} o modelos preentrenados de tipo \emph{encoder-decoder}, no todos los sistemas los emplean de la misma manera.
+Esta sección analiza la forma en que los sistemas \emph{text-to-query} adaptan su modelo base a la tarea, ya que si bien la mayoría de los trabajos revisados utiliza \acp{LLM} o modelos preentrenados de tipo \emph{encoder-decoder}, no todos los sistemas los emplean de la misma manera.
+
+
+
+
+
+
+
+
 
 En términos generales, pueden distinguirse tres estrategias principales: La primera consiste en mantener los parámetros del modelo congelados y adaptar su comportamiento únicamente mediante el \emph{prompt}. La segunda ajusta los parámetros del modelo mediante \emph{fine-tuning} u otros procesos de entrenamiento adicional. La tercera combina ambas aproximaciones, por ejemplo, usando modelos congelados para ciertas etapas del \emph{pipeline} y componentes ajustados para tareas específicas como selección, reordenamiento o verificación.
 
