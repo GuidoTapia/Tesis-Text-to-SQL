@@ -33,3 +33,7 @@ tesis-ejemplo
 *.swp
 *~
 .vscode/
+
+# Local backups
+backups/
+
