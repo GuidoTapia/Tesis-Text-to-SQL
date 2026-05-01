@@ -53,3 +53,27 @@ La segunda corrida expuso un problema real del verificador MVP: los aliases defi
 La tercera corrida entregó números limpios: 20 consultas totales, 20 pasan la verificación estática, 19 ejecutan correctamente en DuckDB, 1 falla en ejecución. La única falla (`id 9` en `car_1`) es un error semántico de tipo (comparación BIGINT vs VARCHAR en un `IN`) que el verificador actual no puede detectar por diseño, ya que solo valida existencia de nombres. La tasa de detección estática para este sample resulta entonces en 0%.
 
 Interpretación responsable: el sample no contiene alucinaciones de nombres porque Claude Haiku 4.5 no las produjo con esquemas de 4 a 11 tablas. Para que la métrica refleje la utilidad esperada del verificador hace falta o bien ampliar el volumen (100–200 preguntas), o bien evaluar con un modelo menos capaz, o bien diseñar preguntas con señuelo de esquema. El resultado positivo del experimento es otro: se validó el flujo completo de medición de punta a punta con métricas guardadas en JSON y reproducibilidad asegurada por seed.
+
+### Reproducibilidad con LLMs
+
+Durante el refactor se observó que dos corridas idénticas del experimento, con la misma seed para el muestreo, devolvían números levemente distintos (un fallo de ejecución se movía entre corridas). El origen es la varianza del modelo: la API de Anthropic, sin una temperatura explícita, muestrea con cierta aleatoriedad incluso con prompts idénticos. Se fijó `temperature=0` en la llamada del helper compartido para reducir esta varianza. La reproducibilidad bit a bit no está garantizada (queda varianza residual del propio servicio), pero los números volvieron a ser estables entre corridas consecutivas en este sample.
+
+### Refactor de helpers compartidos
+
+Se extrajeron las funciones reusables de `run_experiment_01.py` a un módulo `evaluation/_helpers.py` (extracción de SQL del envoltorio markdown, formateo de esquema, llamada al LLM, ejecución sobre DuckDB y persistencia de resultados). El experimento 01 fue actualizado para consumirlas y se verificó que los números resultantes coincidían con los de la corrida previa al refactor. La intención del prefijo guion-bajo es marcar que el módulo es interno a `evaluation/` y no API pública.
+
+### Paso 5b — segundo experimento medible (100 preguntas, 6 bases)
+
+Se escaló el experimento a 100 preguntas distribuidas en 6 bases de Spider de complejidad y forma variadas: `concert_singer`, `world_1`, `car_1`, `wta_1`, `dog_kennels` y `student_transcripts_tracking`. El script vive en `evaluation/run_experiment_02.py` y comparte el helper común. Costo total observado: 36 697 tokens de entrada y 4 996 de salida (≈ USD 0,05) en 111 segundos de ejecución secuencial.
+
+Resultados crudos: 100 consultas, 90 ejecutan sin error, 10 fallan, 0 detectados por el verificador, 0 falsos positivos.
+
+La taxonomía manual de los diez errores resultó más informativa que el agregado: ninguno es alucinación de esquema. Tres son errores semánticos genuinos del LLM (incompatibilidad de tipos en `IN`, columnas no agregadas en `GROUP BY`); siete son problemas de calidad de datos del propio Spider en DuckDB (cinco errores `Conversion Error: invalid date field format ""` por filas con `birth_date` vacío en `players`, y dos errores de `Mismatch Type` por enteros que en SQLite admiten string vacío). La base `wta_1` concentra 7 de los 10 fallos por esta razón, no por dificultad intrínseca de las preguntas.
+
+Conclusiones operativas para futuras corridas:
+
+Primero, antes de ejecutar más experimentos sobre Spider conviene decidir cómo se trata la data sucia en DuckDB: cargar todas las columnas como `VARCHAR` con `sqlite_all_varchar=true`, preprocesar las bases para reemplazar valores inválidos, o aceptar la pérdida y reportarla. Cualquiera de las tres es defendible; lo que no se puede es comparar nuestros números con los de otras publicaciones que usan SQLite directamente sin documentar esta diferencia.
+
+Segundo, el verificador estático sigue sin tener oportunidad de demostrar utilidad: en 100 preguntas con Claude Haiku 4.5 no apareció una sola alucinación de tabla o columna. Los modelos fuertes con esquemas medianos no son el escenario donde este tipo de verificación rinde. Las opciones realistas son evaluar con un modelo más débil, evaluar sobre BIRD (esquemas mucho más grandes), o construir un pequeño conjunto adversarial de preguntas con señuelo de esquema para medir capacidad sin depender de baseline.
+
+Tercero, Claude Haiku 4.5 obtiene 90% de execution accuracy zero-shot en este sample, por encima del 80–85% típico reportado para baselines similares en Spider dev. El número no es estrictamente comparable por el problema de data quality recién mencionado, pero sirve como ancla.
