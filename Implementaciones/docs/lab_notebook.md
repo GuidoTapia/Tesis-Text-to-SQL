@@ -54,6 +54,10 @@ La tercera corrida entregó números limpios: 20 consultas totales, 20 pasan la 
 
 Interpretación responsable: el sample no contiene alucinaciones de nombres porque Claude Haiku 4.5 no las produjo con esquemas de 4 a 11 tablas. Para que la métrica refleje la utilidad esperada del verificador hace falta o bien ampliar el volumen (100–200 preguntas), o bien evaluar con un modelo menos capaz, o bien diseñar preguntas con señuelo de esquema. El resultado positivo del experimento es otro: se validó el flujo completo de medición de punta a punta con métricas guardadas en JSON y reproducibilidad asegurada por seed.
 
+---
+
+## 2026-05-01
+
 ### Reproducibilidad con LLMs
 
 Durante el refactor se observó que dos corridas idénticas del experimento, con la misma seed para el muestreo, devolvían números levemente distintos (un fallo de ejecución se movía entre corridas). El origen es la varianza del modelo: la API de Anthropic, sin una temperatura explícita, muestrea con cierta aleatoriedad incluso con prompts idénticos. Se fijó `temperature=0` en la llamada del helper compartido para reducir esta varianza. La reproducibilidad bit a bit no está garantizada (queda varianza residual del propio servicio), pero los números volvieron a ser estables entre corridas consecutivas en este sample.
