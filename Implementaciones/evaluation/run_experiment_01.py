@@ -20,12 +20,9 @@ from __future__ import annotations
 import json
 import os
 import random
-import re
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
-import duckdb
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
@@ -33,6 +30,16 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.verifier.static import verify_sql  # noqa: E402
+from evaluation._helpers import (  # noqa: E402
+    MODEL_DEFAULT,
+    build_schema_map,
+    execute_on_db,
+    generate_sql,
+    schema_as_dict,
+    schema_as_prompt,
+    write_results,
+)
+
 SPIDER = ROOT / "corpus" / "spider_bird"
 DEV = SPIDER / "dev.json"
 TABLES = SPIDER / "tables.json"
@@ -42,59 +49,6 @@ RUNS_DIR = ROOT / "evaluation" / "runs"
 DBS = ["concert_singer", "car_1", "student_transcripts_tracking"]
 N_TOTAL = 20
 SEED = 42
-MODEL_DEFAULT = "claude-haiku-4-5-20251001"
-
-SYSTEM_PROMPT = (
-    "Sos un traductor de lenguaje natural a SQL. "
-    "Respondés exclusivamente con la consulta SQL que responde la pregunta, "
-    "sin explicaciones, sin bloques de código, sin prefijos. "
-    "El SQL debe ser válido para SQLite."
-)
-
-FENCE_RE = re.compile(r"^```(?:sql|sqlite)?\s*\n(.*?)\n?```\s*$", re.DOTALL | re.IGNORECASE)
-
-
-def extract_sql(raw: str) -> str:
-    """
-    Extrae el cuerpo SQL de una respuesta del LLM.
-
-    Los modelos conversacionales a veces envuelven la consulta en bloques markdown
-    (```sql ... ```) incluso cuando el prompt lo prohíbe. Esta función lo tolera
-    para que el verificador y el ejecutor reciban SQL parseable.
-    """
-    text = raw.strip()
-    m = FENCE_RE.match(text)
-    if m:
-        return m.group(1).strip()
-    return text
-
-
-def build_schema_map(tables_path: Path) -> dict[str, dict]:
-    return {e["db_id"]: e for e in json.loads(tables_path.read_text())}
-
-
-def schema_as_dict(entry: dict) -> dict[str, list[str]]:
-    tables = entry["table_names_original"]
-    cols = entry["column_names_original"]
-    out: dict[str, list[str]] = {t: [] for t in tables}
-    for tbl_idx, col_name in cols:
-        if tbl_idx < 0:
-            continue
-        out[tables[tbl_idx]].append(col_name)
-    return out
-
-
-def schema_as_prompt(entry: dict) -> str:
-    tables = entry["table_names_original"]
-    cols = entry["column_names_original"]
-    col_types = entry["column_types"]
-    per_table: dict[str, list[str]] = {t: [] for t in tables}
-    for (tbl_idx, col_name), ct in zip(cols, col_types):
-        if tbl_idx < 0:
-            continue
-        per_table[tables[tbl_idx]].append(f"  {col_name} {ct.upper()}")
-    blocks = [f"{t} (\n" + ",\n".join(per_table[t]) + "\n)" for t in tables]
-    return "\n\n".join(blocks)
 
 
 def sample_questions(dev_path: Path, dbs: list[str], total: int, seed: int) -> list[dict]:
@@ -109,37 +63,6 @@ def sample_questions(dev_path: Path, dbs: list[str], total: int, seed: int) -> l
     return picks
 
 
-def generate_sql(
-    client: Anthropic, model: str, schema_str: str, question: str
-) -> tuple[str, int, int]:
-    msg = client.messages.create(
-        model=model,
-        max_tokens=512,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": f"Esquema:\n{schema_str}\n\nPregunta: {question}",
-            }
-        ],
-    )
-    raw = msg.content[0].text
-    return extract_sql(raw), msg.usage.input_tokens, msg.usage.output_tokens
-
-
-def execute_on_db(db_id: str, sql: str) -> tuple[bool, str | None]:
-    sqlite_path = DB_ROOT / db_id / f"{db_id}.sqlite"
-    try:
-        con = duckdb.connect(":memory:")
-        con.execute("INSTALL sqlite; LOAD sqlite")
-        con.execute(f"ATTACH '{sqlite_path}' AS spider_db (TYPE sqlite)")
-        con.execute("USE spider_db")
-        con.execute(sql).fetchall()
-        return True, None
-    except Exception as exc:
-        return False, str(exc)
-
-
 def main() -> int:
     load_dotenv(ROOT / ".env")
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -148,7 +71,6 @@ def main() -> int:
         return 2
     model = os.environ.get("ANTHROPIC_MODEL", MODEL_DEFAULT)
 
-    RUNS_DIR.mkdir(parents=True, exist_ok=True)
     schemas = build_schema_map(TABLES)
     client = Anthropic(api_key=api_key)
 
@@ -162,7 +84,7 @@ def main() -> int:
             client, model, schema_as_prompt(schema_entry), q["question"]
         )
         verifier_errors = verify_sql(pred, schema_as_dict(schema_entry))
-        executes_ok, exec_error = execute_on_db(db_id, pred)
+        executes_ok, exec_error = execute_on_db(DB_ROOT, db_id, pred)
 
         results.append(
             {
@@ -209,22 +131,18 @@ def main() -> int:
     else:
         print("sin errores de ejecución — sin tasa de detección que calcular")
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = RUNS_DIR / f"experiment_01_{ts}.json"
-    out_path.write_text(
-        json.dumps(
-            {
-                "metadata": {
-                    "model": model,
-                    "seed": SEED,
-                    "dbs": DBS,
-                    "n_total": N_TOTAL,
-                    "generated_at": ts,
-                },
-                "results": results,
+    out_path = write_results(
+        RUNS_DIR,
+        "experiment_01",
+        {
+            "metadata": {
+                "model": model,
+                "seed": SEED,
+                "dbs": DBS,
+                "n_total": N_TOTAL,
             },
-            indent=2,
-        )
+            "results": results,
+        },
     )
     print()
     print(f"resultados guardados en: {out_path.relative_to(ROOT)}")
