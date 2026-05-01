@@ -81,3 +81,13 @@ Primero, antes de ejecutar más experimentos sobre Spider conviene decidir cómo
 Segundo, el verificador estático sigue sin tener oportunidad de demostrar utilidad: en 100 preguntas con Claude Haiku 4.5 no apareció una sola alucinación de tabla o columna. Los modelos fuertes con esquemas medianos no son el escenario donde este tipo de verificación rinde. Las opciones realistas son evaluar con un modelo más débil, evaluar sobre BIRD (esquemas mucho más grandes), o construir un pequeño conjunto adversarial de preguntas con señuelo de esquema para medir capacidad sin depender de baseline.
 
 Tercero, Claude Haiku 4.5 obtiene 90% de execution accuracy zero-shot en este sample, por encima del 80–85% típico reportado para baselines similares en Spider dev. El número no es estrictamente comparable por el problema de data quality recién mencionado, pero sirve como ancla.
+
+### Paso 5c — segundo motor de ejecución y línea base comparable
+
+Se eligió la opción D para resolver la cuestión del manejo de data sucia en Spider: agregar un segundo backend de ejecución basado en `sqlite3` de la stdlib y dejar DuckDB para SQL/PGQ donde el motor estricto es necesario y la data es nuestra. El verificador queda intacto porque opera sobre el SQL y el esquema, no sobre el motor.
+
+Se extendió `evaluation/_helpers.execute_on_db` para aceptar un parámetro `engine` que despacha a `_execute_duckdb` (default, comportamiento previo preservado) o a `_execute_sqlite` (nuevo). Los experimentos 01 y 02 siguen usando DuckDB sin cambios. Se construyó `evaluation/run_experiment_03.py`, que carga las predicciones del experimento 02 más reciente y las re-ejecuta sobre `sqlite3` sin volver a llamar al LLM. Esta decisión metodológica aísla el efecto del motor: las predicciones son idénticas, lo único que varía es quién las ejecuta.
+
+Resultado: DuckDB ejecuta 90 de 100 consultas; sqlite3 ejecuta 98. Las 8 consultas que solo fallan en DuckDB son exactamente las que se sospechaba (campos de fecha vacíos en `wta_1.players.birth_date`, string `'null'` en `cars_data.Horsepower`, `player_id` vacío en `wta_1`). En 0 consultas ocurre lo opuesto, lo que confirma que DuckDB en este contexto es un superset de chequeos respecto de SQLite. Solo 2 fallos sobreviven en ambos motores y son errores semánticos genuinos del LLM (`GROUP BY` violado, comparación de tipos en `IN`).
+
+Implicaciones para los reportes futuros: la línea base comparable con la literatura es **98% de execution accuracy de Claude Haiku 4.5 en este sample de Spider dev**. El número en DuckDB queda como métrica interna útil para el pipeline PGQ. Reportar ambos en el capítulo de evaluación, siempre con la advertencia de cuál es la métrica relevante para qué comparación.
