@@ -91,7 +91,63 @@ def _compile_from(f: ir.FromExpr) -> str:
         return f"({_compile_query(f.query)}) AS {f.alias}"
     if isinstance(f, ir.Join):
         return _compile_join(f)
+    if isinstance(f, ir.FromGraphMatch):
+        return _compile_from_graph_match(f)
     raise NotImplementedError(f"compile_from: tipo no soportado {type(f).__name__}")
+
+
+# ---------------------------------------------------------------------------
+# Bloques de grafo (rebanada 2)
+# ---------------------------------------------------------------------------
+
+
+def _compile_from_graph_match(f: ir.FromGraphMatch) -> str:
+    """DuckPGQ no acepta el keyword ``AS`` entre ``GRAPH_TABLE(...)`` y el
+    alias; el alias va separado solo por un espacio."""
+    body = f"GRAPH_TABLE ({_compile_match_pattern(f.match)})"
+    if f.alias:
+        return f"{body} {f.alias}"
+    return body
+
+
+def _compile_match_pattern(m: ir.MatchPattern) -> str:
+    parts = [m.graph, "MATCH"]
+    parts.append(", ".join(_compile_path_pattern(p) for p in m.patterns))
+    if m.where is not None:
+        parts.append("WHERE " + _compile_expr(m.where))
+    cols = ", ".join(_compile_select_item(c) for c in m.columns)
+    parts.append(f"COLUMNS ({cols})")
+    return " ".join(parts)
+
+
+def _compile_path_pattern(p: ir.PathPattern) -> str:
+    parts = [_compile_vertex_pattern(p.head)]
+    for edge, vertex in p.steps:
+        parts.append(_compile_edge_pattern(edge))
+        parts.append(_compile_vertex_pattern(vertex))
+    return "".join(parts)
+
+
+def _compile_vertex_pattern(v: ir.VertexPattern) -> str:
+    label = f":{v.label}" if v.label else ""
+    return f"({v.var}{label})"
+
+
+def _compile_edge_pattern(e: ir.EdgePattern) -> str:
+    """DuckPGQ exige variable explícita en el edge incluso cuando no se usa.
+
+    El compilador preserva la dirección que la IR declara: ``->`` (hacia adelante),
+    ``<-`` (hacia atrás) y ``-`` (no dirigida).
+    """
+    label = f":{e.label}" if e.label else ""
+    body = f"[{e.var}{label}]"
+    if e.direction == "->":
+        return f"-{body}->"
+    if e.direction == "<-":
+        return f"<-{body}-"
+    if e.direction == "-":
+        return f"-{body}-"
+    raise NotImplementedError(f"_compile_edge_pattern: dirección desconocida {e.direction!r}")
 
 
 def _compile_join(j: ir.Join) -> str:

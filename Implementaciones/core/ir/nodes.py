@@ -206,7 +206,8 @@ class Join:
     using: Optional[tuple[str, ...]] = None
 
 
-FromExpr = Union[FromTable, FromSubquery, Join]
+# ``FromGraphMatch`` se define más abajo (rebanada 2). El tipo unión se cierra
+# después de su declaración.
 
 
 # ---------------------------------------------------------------------------
@@ -306,15 +307,17 @@ class GraphQuery:
     match: MatchPattern
 
 
-# Composición híbrida (rebanada 3): el resultado de un MatchPattern aparece
-# como tabla derivada en una FromExpr relacional. Sólo declarado.
+# Composición híbrida: el resultado de un ``MatchPattern`` aparece como tabla
+# derivada en una ``FromExpr`` relacional. Una consulta puramente de grafo es
+# el caso especial donde la única tabla del FROM es un ``FromGraphMatch``.
 
 
 @dataclass(frozen=True)
 class FromGraphMatch:
+    """Bloque ``GRAPH_TABLE(...)`` usado como fuente en una cláusula FROM."""
+
     match: MatchPattern
-    alias: str
+    alias: Optional[str] = None
 
 
-# Cuando rebanada 3 esté implementada, FromExpr se ampliará a
-# ``Union[FromTable, FromSubquery, Join, FromGraphMatch]``.
+FromExpr = Union[FromTable, FromSubquery, Join, FromGraphMatch]
