@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "description": "Conjunto adversarial mínimo para evaluar la capacidad del verificador estático de detectar alucinaciones de esquema. Las preguntas están construidas a mano sobre tres bases de Spider para inducir al LLM a inventar tablas o columnas inexistentes. Las preguntas marcadas como control son directamente respondibles con el esquema y sirven para medir falsos positivos del verificador.",
+  "categories": {
+    "missing-column": "El esquema no tiene la columna que la pregunta presupone. El LLM puede inventarla.",
+    "missing-table": "El esquema no tiene la tabla que la pregunta presupone. El LLM puede inventarla, posiblemente con un JOIN imaginario.",
+    "decoy-rename": "El esquema tiene una columna semánticamente equivalente pero con un nombre distinto. El LLM puede usar el nombre que la pregunta sugiere.",
+    "implicit-attribute": "La columna existe pero la pregunta la formula como otra (por ejemplo, Is_male para preguntar por mujeres).",
+    "control": "La pregunta es respondible con el esquema. Sirve para validar que el verificador no produce falsos positivos."
+  },
+  "questions": [
+    {
+      "id": "concert_singer-adv-01",
+      "db_id": "concert_singer",
+      "category": "missing-column",
+      "question": "What is the email address of the singer named Joe Sharp?",
+      "expected_hallucination": "email",
+      "rationale": "El esquema de singer tiene Name, Country, Song_Name, Age, Is_male, pero no datos de contacto."
+    },
+    {
+      "id": "concert_singer-adv-02",
+      "db_id": "concert_singer",
+      "category": "missing-column",
+      "question": "What was the genre of the song 'Hey'?",
+      "expected_hallucination": "genre",
+      "rationale": "Existe Song_Name pero no Genre."
+    },
+    {
+      "id": "concert_singer-adv-03",
+      "db_id": "concert_singer",
+      "category": "decoy-rename",
+      "question": "What is the nationality of the youngest singer?",
+      "expected_hallucination": "nationality",
+      "rationale": "El esquema usa Country, pero la pregunta evoca Nationality."
+    },
+    {
+      "id": "concert_singer-adv-04",
+      "db_id": "concert_singer",
+      "category": "missing-table",
+      "question": "Which awards has each singer won?",
+      "expected_hallucination": "awards",
+      "rationale": "No existe tabla de awards ni FK desde singer."
+    },
+    {
+      "id": "concert_singer-adv-05",
+      "db_id": "concert_singer",
+      "category": "implicit-attribute",
+      "question": "How many female singers are from Brazil?",
+      "expected_hallucination": "gender o female",
+      "rationale": "Existe Is_male; la pregunta puede inducir a inventar gender o is_female."
+    },
+    {
+      "id": "concert_singer-ctrl-01",
+      "db_id": "concert_singer",
+      "category": "control",
+      "question": "How many singers are there in total?",
+      "expected_hallucination": null,
+      "rationale": "Pregunta directa sobre la tabla singer."
+    },
+    {
+      "id": "concert_singer-ctrl-02",
+      "db_id": "concert_singer",
+      "category": "control",
+      "question": "What is the name of the stadium with the largest capacity?",
+      "expected_hallucination": null,
+      "rationale": "Pregunta directa sobre la tabla stadium."
+    },
+
+    {
+      "id": "car_1-adv-01",
+      "db_id": "car_1",
+      "category": "missing-column",
+      "question": "What is the price of the BMW Z4?",
+      "expected_hallucination": "price",
+      "rationale": "cars_data tiene MPG, Cylinders, Horsepower, Weight, Accelerate, Year — no incluye precios."
+    },
+    {
+      "id": "car_1-adv-02",
+      "db_id": "car_1",
+      "category": "missing-column",
+      "question": "Which car has the highest top speed?",
+      "expected_hallucination": "top_speed",
+      "rationale": "No existe top_speed; el LLM puede inventarlo o aproximar con otro campo."
+    },
+    {
+      "id": "car_1-adv-03",
+      "db_id": "car_1",
+      "category": "missing-column",
+      "question": "What are the available colors for cars made in 1980?",
+      "expected_hallucination": "color",
+      "rationale": "No hay columna color."
+    },
+    {
+      "id": "car_1-adv-04",
+      "db_id": "car_1",
+      "category": "missing-table",
+      "question": "Show me the maintenance history for each car model.",
+      "expected_hallucination": "maintenance",
+      "rationale": "No existe tabla de maintenance."
+    },
+    {
+      "id": "car_1-adv-05",
+      "db_id": "car_1",
+      "category": "missing-column",
+      "question": "Which cars have automatic transmission?",
+      "expected_hallucination": "transmission",
+      "rationale": "No hay columna transmission ni en cars_data ni en car_names."
+    },
+    {
+      "id": "car_1-ctrl-01",
+      "db_id": "car_1",
+      "category": "control",
+      "question": "What is the average horsepower of all cars?",
+      "expected_hallucination": null,
+      "rationale": "Pregunta directa con AVG sobre cars_data."
+    },
+
+    {
+      "id": "wta_1-adv-01",
+      "db_id": "wta_1",
+      "category": "missing-column",
+      "question": "What are the heights of the players?",
+      "expected_hallucination": "height",
+      "rationale": "players tiene first_name, last_name, hand, birth_date, country_code — no height."
+    },
+    {
+      "id": "wta_1-adv-02",
+      "db_id": "wta_1",
+      "category": "missing-column",
+      "question": "How much prize money has each player won in total?",
+      "expected_hallucination": "prize_money",
+      "rationale": "No hay columna de prize money ni en matches ni en rankings."
+    },
+    {
+      "id": "wta_1-adv-03",
+      "db_id": "wta_1",
+      "category": "missing-table",
+      "question": "Show me each player's coach name.",
+      "expected_hallucination": "coach o coaches",
+      "rationale": "No existe tabla coach."
+    },
+    {
+      "id": "wta_1-adv-04",
+      "db_id": "wta_1",
+      "category": "missing-column",
+      "question": "What is the gender of the highest-ranked player?",
+      "expected_hallucination": "gender",
+      "rationale": "wta_1 es de tenis femenino; la pregunta sobre gender es vacía pero el LLM puede inventar la columna."
+    },
+    {
+      "id": "wta_1-adv-05",
+      "db_id": "wta_1",
+      "category": "missing-column",
+      "question": "Which racket brand does the top player use?",
+      "expected_hallucination": "racket o brand",
+      "rationale": "No hay datos de equipamiento."
+    },
+    {
+      "id": "wta_1-ctrl-01",
+      "db_id": "wta_1",
+      "category": "control",
+      "question": "How many players are from the USA?",
+      "expected_hallucination": null,
+      "rationale": "Pregunta directa sobre players con country_code."
+    },
+    {
+      "id": "wta_1-ctrl-02",
+      "db_id": "wta_1",
+      "category": "control",
+      "question": "Who are the players whose first name starts with 'A'?",
+      "expected_hallucination": null,
+      "rationale": "Pregunta directa sobre players con LIKE."
+    }
+  ]
+}
