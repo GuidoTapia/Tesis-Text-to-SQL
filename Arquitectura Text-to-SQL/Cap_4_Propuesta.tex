@@ -14,7 +14,7 @@ La propuesta se presenta como un trabajo experimental e incremental, siendo que 
 Para desarrollar la propuesta se tomaron como base seis elementos del estado del arte y del ecosistema de bases de datos: tres provenientes de la literatura \emph{text-to-SQL} (XiYan-SQL, CHESS, RSL-SQL), uno del ecosistema relacional con extensión a grafos (DuckDB con la extensión DuckPGQ), uno como marco de evaluación canónico (NL2SQL360) y uno como infraestructura de análisis estático de SQL (sqlglot). Estos elementos no se eligieron por exhaustividad sino por satisfacer simultáneamente cinco criterios, formulados aquí de manera explícita para que la decisión sea reproducible:
 
 \begin{enumerate}
-    \item \textbf{Cobertura conceptual de al menos una dimensión del marco taxonómico.} Cada base aborda con detalle al menos una de las seis dimensiones definidas en el Cuadro~\ref{tab:sota-taxonomia} (paradigma de aprendizaje, arquitectura, representación, enriquecimiento, razonamiento o evaluación), de modo que la integración de las bases cubre el espectro relevante para la propuesta.
+    \item \textbf{Cobertura conceptual de al menos una dimensión del marco taxonómico.} Cada base aborda con detalle al menos una de las seis dimensiones definidas en la Sección~\ref{sec:sota-taxonomia} (paradigma de aprendizaje, arquitectura, representación, enriquecimiento, razonamiento o evaluación), de modo que la integración de las bases cubre el espectro relevante para la propuesta.
     \item \textbf{Compatibilidad con el estándar \ac{SQL}/\ac{PGQ}.} La base debe poder integrarse en un \emph{pipeline} cuya salida final es una consulta sobre el estándar ISO/IEC 9075-16:2023~\cite{ISO9075_16_2023}, ya sea como motor de ejecución directo o como componente cuya salida pueda traducirse a ese dialecto.
     \item \textbf{Modificabilidad por puntos de extensión.} Cada base admite extensión sin modificación intrusiva del código fuente, mediante adaptadores, herencia o configuración. Las modificaciones requeridas se documentan en la Sección~\ref{sec:prop-implementacion}.
     \item \textbf{Reproducibilidad operacional.} Cada base puede instalarse con dependencias resueltas de forma determinista. Las versiones de las dependencias críticas se documentan en la Sección~\ref{sec:prop-implementacion}.
@@ -22,7 +22,7 @@ Para desarrollar la propuesta se tomaron como base seis elementos del estado del
 
 A continuación se describe cada base, con la razón específica que motiva su elección además de los criterios comunes anteriores.
 
-\paragraph{XiYan-SQL~\cite{XiYan-SQL2024}.} Sistema multi-generador de \emph{text-to-SQL}, del cual se reutiliza, en primera instancia, la representación \textbf{M-Schema}: un formato semi-estructurado del esquema relacional que combina nombres, tipos, claves primarias, claves foráneas y muestras de valores en un bloque presentable directamente al \ac{LLM}. M-Schema es una de las representaciones de esquema más adoptadas en la literatura reciente, y constituye el punto de partida natural para extender el formato a esquemas duales (Sección~\ref{subsec:prop-anclaje}). El propio repositorio público de XiYan-SQL es un meta-repositorio que enlaza a los componentes ejecutables (modelos \texttt{XiYanSQL-QwenCoder}, marco de entrenamiento, servidores MCP); este hecho, descubierto durante la fase de integración, condicionó la decisión de incorporar XiYan-SQL primero como referencia de diseño y posponer la integración de los componentes ejecutables, según se detalla en la Sección~\ref{sec:prop-decisiones}.
+\paragraph{XiYan-SQL~\cite{XiYan-SQL2024}.} Sistema multi-generador de \emph{text-to-SQL}, del cual se reutiliza, en primera instancia, la representación \textbf{M-Schema}: un formato semi-estructurado del esquema relacional que combina nombres, tipos, claves primarias, claves foráneas y muestras de valores en un bloque presentable directamente al \ac{LLM}. M-Schema es una de las representaciones de esquema más adoptadas en la literatura reciente, y constituye el punto de partida natural para extender el formato a esquemas duales. El propio repositorio público de XiYan-SQL es un meta-repositorio que enlaza a los componentes ejecutables (modelos \texttt{XiYanSQL-QwenCoder}, marco de entrenamiento, servidores MCP); este hecho, descubierto durante la fase de integración, condicionó la decisión de incorporar XiYan-SQL primero como referencia de diseño y posponer la integración de los componentes ejecutables.
 
 \paragraph{CHESS~\cite{CHESS2024}.} Sistema modular con razonamiento contextual y verificación basada en ejecución. Se utiliza como \emph{baseline} arquitectónico comparativo y como fuente conceptual de dos mecanismos: (a) la recuperación de valores de la base de datos mediante búsqueda por similitud aproximada, que se adapta para recuperar también valores asociados a propiedades de vértices y aristas del grafo de propiedad; y (b) un esquema de verificación dinámica con retroalimentación al generador, que se reformula en esta tesis bajo el principio de mediación obligatoria por representación intermedia (P2, Sección~\ref{sec:prop-requisitos}).
 
@@ -35,7 +35,7 @@ A continuación se describe cada base, con la razón específica que motiva su e
 \paragraph{sqlglot.}
 % TODO: agregar entrada BibTeX para sqlglot (Tobias Mao, https://github.com/tobymao/sqlglot)
 % e introducir la cita \cite{sqlglot} en este párrafo cuando esté lista.
-Biblioteca de \emph{parsing} y transformación de SQL en Python (Tobias Mao, \texttt{github.com/tobymao/sqlglot}) que soporta múltiples dialectos, incluido \texttt{duckdb}. Se utiliza como \emph{front-end} sintáctico del verificador estático: produce un árbol de sintaxis abstracta sobre el cual se aplican las reglas locales de existencia de tablas, columnas y compatibilidad de aliases. La elección obedece a la madurez de la biblioteca y a su soporte explícito de DuckDB; no se reutiliza ningún parser \emph{ad hoc}.
+Biblioteca de \emph{parsing} y transformación de SQL en Python (Tobias Mao, \url{github.com/tobymao/sqlglot}) que soporta múltiples dialectos, incluido \texttt{duckdb}. Se utiliza como \emph{front-end} sintáctico del verificador estático: produce un árbol de sintaxis abstracta sobre el cual se aplican las reglas locales de existencia de tablas, columnas y compatibilidad de aliases. La elección obedece a la madurez de la biblioteca y a su soporte explícito de DuckDB; no se reutiliza ningún parser \emph{ad hoc}.
 
 \medskip
 
@@ -94,7 +94,7 @@ elementos existentes, consistencia de tipos y coherencia entre los componentes
 relacionales y de grafo; y (b) verificación dinámica mediante ejecución
 controlada en un entorno de validación con DuckPGQ como motor de
 referencia~\cite{DuckPGQ}. Este requisito retoma las propuestas de
-verificación revisadas en la Sección~\ref{sec:sota-decodificacion} y amplía su
+verificación revisadas en la Sección~\ref{subsec:sota-d3c-decoding} y amplía su
 alcance al dominio híbrido.
 
 \paragraph{R5. Modularidad y agnosticismo respecto del \ac{LLM}.} Los
@@ -225,11 +225,87 @@ clarificación del usuario, en consonancia con lo planteado por
 
 
 
-
-
-
 \section{Arquitectura y componentes}
 \label{sec:prop-arquitectura}
+
+Esta sección detalla los cuatro componentes arquitectónicos que materializan el \emph{pipeline}: el anclaje al esquema dual (\S\ref{subsec:prop-anclaje}), la \ac{RI} tipada IR-SQL/PGQ (\S\ref{subsec:prop-ri}), el compilador determinista (\S\ref{subsec:prop-compilador}) y el bucle de verificación (\S\ref{subsec:prop-verificacion}).
+
+\subsection{Anclaje al esquema dual}
+\label{subsec:prop-anclaje}
+
+El primer componente resuelve un problema estructural que los sistemas \emph{text-to-SQL} clásicos no enfrentan: la pregunta en lenguaje natural debe proyectarse sobre dos estructuras superpuestas. Un mismo concepto lingüístico puede corresponder simultáneamente a una tabla relacional y a una etiqueta de vértice en el grafo de propiedad. La arquitectura necesita identificar cuál de las dos proyecciones es relevante, o si ambas lo son, antes de proceder a la generación.
+
+Para ello, se define un \emph{esquema proyectado}
+\[
+\Sigma_{\mathrm{proj}} \;=\; \langle T_{\mathrm{rel}},\, V_{\mathrm{grafo}},\, E_{\mathrm{grafo}},\, C_{\mathrm{val}} \rangle,
+\]
+donde $T_{\mathrm{rel}}$ es el subconjunto relevante de tablas y columnas relacionales, $V_{\mathrm{grafo}}$ y $E_{\mathrm{grafo}}$ son los subconjuntos de tipos de vértice y arista del grafo de propiedad, y $C_{\mathrm{val}}$ es el conjunto de valores recuperados de la base que coinciden con menciones literales en la pregunta. La construcción de $\Sigma_{\mathrm{proj}}$ se apoya en tres mecanismos complementarios:
+
+\begin{itemize}
+    \item \textbf{Representación enriquecida del esquema.} Se adopta y extiende el formato M-Schema introducido por \textsc{XiYan-SQL}~\cite{XiYan-SQL2024}, agregando descriptores de grafo (declaraciones \texttt{VERTEX TABLES} y \texttt{EDGE TABLES}) al bloque semi-estructurado que se presenta al \ac{LLM}. La extensión se realiza fuera del repositorio original, en el módulo propio \texttt{core/anchor/m\_schema\_dual.py}.
+    \item \textbf{Enlazado bidireccional.} Inspirado en \textsc{RSL-SQL}~\cite{RSL-SQL2024}, el enlazado se ejecuta en dos pasadas y retiene únicamente los elementos del esquema corroborados en ambas direcciones. La implementación es propia; RSL-SQL se reutiliza como descripción de mecanismo, no como código.
+    \item \textbf{Recuperación de valores.} Se adopta la idea de búsqueda por similitud aproximada propuesta en \textsc{CHESS}~\cite{CHESS2024} y se adapta para recuperar también valores asociados a propiedades de vértices y aristas del grafo de propiedad.
+\end{itemize}
+
+El esquema proyectado es el único contexto estructural que las etapas posteriores consumen sobre la base de datos: la arquitectura no admite que el \ac{LLM} invoque elementos ausentes de $\Sigma_{\mathrm{proj}}$ al construir la \ac{RI}.
+
+\subsection{Representación intermedia tipada (IR-SQL/PGQ)}
+\label{subsec:prop-ri}
+
+La \ac{RI} propuesta, denominada \textbf{IR-SQL/PGQ}, es el componente central de la arquitectura.
+
+
+\paragraph{Relación con representaciones intermedias previas.} IR-SQL/PGQ se presenta como una extensión para las arquitecturas de text to query tomando como base a \textsc{SemQL}, \textsc{NatSQL} ni a los \emph{skeletons} de \textsc{RESDSQL}. La novedad reside en el tratamiento uniforme de los bloques de grafo y en la composicionalidad híbrida.
+
+
+\subsection{Compilador determinista a SQL/PGQ}
+\label{subsec:prop-compilador}
+
+El compilador transforma una instancia válida de IR-SQL/PGQ en una consulta concreta en dialecto \ac{SQL}/\ac{PGQ}. La operación es determinista en sentido estricto: dos instancias estructuralmente idénticas de la \ac{RI} producen la misma consulta compilada, independientemente de estados externos o de llamadas al \ac{LLM}.
+
+La compilación procede por recorrido ascendente del árbol. Los bloques relacionales se traducen a \ac{SQL} estándar siguiendo reglas análogas a las de \textsc{NatSQL}~\cite{IRNet}.
+% TODO: reemplazar por la cita canónica de NatSQL (Gan et al., 2021) cuando se agregue al BibTeX.
+Los bloques de grafo se traducen a la cláusula \texttt{FROM GRAPH\_TABLE(\ldots\ MATCH \ldots\ COLUMNS (\ldots))} del estándar~\cite{DuckPGQ}; los bloques híbridos se materializan como subconsultas donde el resultado de \texttt{GRAPH\_TABLE} participa como tabla derivada en el contexto relacional. Una restricción operativa heredada del motor merece mención: en la versión actual de DuckPGQ, los patrones \texttt{MATCH} exigen una variable explícita en cada arista (por ejemplo, \texttt{(a:Person)-[k:knows]->(b:Person)} en lugar de \texttt{(a:Person)-[:knows]->(b:Person)}); el compilador genera dicha variable de forma sistemática aunque no se utilice posteriormente, decisión documentada en el registro técnico del prototipo.
+
+El compilador no realiza optimización. La consulta producida puede no ser la más eficiente posible, pero es válida por construcción respecto al estándar y al esquema. La optimización se delega al motor de ejecución (DuckDB con la extensión DuckPGQ), siguiendo el principio de separación de responsabilidades.
+
+\subsection{Bucle de verificación}
+\label{subsec:prop-verificacion}
+
+La verificación se organiza en dos regímenes encadenados, conforme al principio P3.
+
+\paragraph{Verificación estática.} Opera sobre IR-SQL/PGQ y sobre la \ac{SQL}/\ac{PGQ} compilada, sin ejecutarla. Comprende tres tipos de chequeos:
+
+\begin{itemize}
+    \item \textbf{Consistencia referencial.} Toda referencia a una tabla, columna, vértice, arista o propiedad debe corresponder a un elemento declarado en $\Sigma_{\mathrm{proj}}$. Una referencia no resuelta indica una alucinación referencial del modelo.
+    \item \textbf{Consistencia de tipos.} Los operadores se aplican únicamente sobre operandos cuyos tipos los admiten; por ejemplo, una agregación \texttt{AVG} no se aplica sobre una columna de tipo \texttt{VARCHAR}.
+    \item \textbf{Coherencia cruzada relacional--grafo.} En bloques \texttt{HybridComposition} se verifica que los tipos de vértice referenciados tengan una tabla relacional asociada según la declaración del grafo de propiedad.
+\end{itemize}
+
+La verificación estática conecta con la tradición de la decodificación restringida inaugurada por \textsc{PICARD}~\cite{PICARD2022}, pero opera a un nivel de abstracción superior en lugar de sobre \emph{tokens}. La implementación inicial del verificador se basa en el \emph{front-end} sintáctico de sqlglot y se ha validado sobre el primer experimento documentado en la Sección~\ref{sec:prop-implementacion}.
+
+\paragraph{Verificación dinámica.} Si la verificación estática se supera, la consulta se ejecuta sobre una instancia de DuckDB con la extensión DuckPGQ cargada~\cite{DuckPGQ}. El motor actúa como \emph{oráculo parcial}: clasifica la consulta como válida, inválida por error de ejecución, o ejecutable pero con salida atípica (cardinalidad cero, presencia inesperada de valores nulos). Los errores y las salidas atípicas generan señales que retroalimentan la construcción de la \ac{RI}, en línea con la estrategia \emph{execution-guided} documentada en \cite{CHESS2024, TS-SQL2025, SQLHD2025}.
+
+\paragraph{Política de retroalimentación estructurada.} El bucle no reenvía al \ac{LLM} el mensaje de error crudo del motor, como es habitual en esquemas de autocorrección. La señal se traduce a un descriptor categórico que se inyecta como contexto adicional en la etapa de construcción de la \ac{RI}. Esta mediación es consistente con el principio P4 y con la taxonomía de errores propuesta por \cite{errorllm2026}.
+
+\section{Implementación y replicabilidad}
+\label{sec:prop-implementacion}
+
+Esta sección documenta la estrategia de implementación, las versiones específicas del stack técnico, la estructura del prototipo, la procedencia de cada componente y el estado actual del trabajo.
+
+\subsection{Stack técnico y versiones declaradas}
+\label{subsec:prop-stack}
+
+El prototipo se ejecuta sobre el siguiente stack, fijado para satisfacer el requisito R8 (reproducibilidad operacional):
+
+\begin{description}
+    \item[Sistema operativo.] macOS, arquitectura \texttt{arm64}. Se documentan posibles incompatibilidades con otros SO a medida que aparecen.
+    \item[Gestor de entornos.] \texttt{uv} (Astral), versión 0.11 o superior, con Python 3.11.15. Esta elección sustituye a \texttt{conda}, considerada inicialmente.
+    \item[Motor de ejecución.] DuckDB versión 1.4.4, con la extensión community \texttt{duckpgq}, la decisión de la versión se debe a que esta extensión \emph{no} está publicada para DuckDB 1.5.x o superiores sobre \texttt{osx\_arm64} al momento de redacción.
+    \item[Modelo de lenguaje inicial.] Anthropic Claude Haiku 4.5 (\texttt{claude-haiku-4-5}). El modelo se considera intercambiable conforme al principio P5; su elección inicial responde a costo, latencia y disponibilidad de credenciales. Se prevé evaluar Claude Sonnet 4.6, GPT 4, Gemini 3 y modelos experimentales en la fase de experimentos reportables.
+    \item[Análisis sintáctico de SQL.] sqlglot, configurado con dialecto \texttt{duckdb}.
+    \item[Marco de evaluación.] NL2SQL360~\cite{SuperSQL2024} para métricas canónicas sobre \textsc{Spider} y \textsc{BIRD}; un módulo propio para métricas del régimen híbrido.
+\end{description}
 
 \section{Implementación sobre la base experimental}
 \label{sec:prop-implementacion}
