@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -86,7 +87,26 @@ def generate_sql(
     return extract_sql(msg.content[0].text), msg.usage.input_tokens, msg.usage.output_tokens
 
 
-def execute_on_db(db_root: Path, db_id: str, sql: str) -> tuple[bool, str | None]:
+def execute_on_db(
+    db_root: Path, db_id: str, sql: str, engine: str = "duckdb"
+) -> tuple[bool, str | None]:
+    """
+    Ejecuta `sql` sobre la base `db_id` y devuelve (ok, error_str).
+
+    El parámetro `engine` selecciona el motor de ejecución:
+    - "duckdb" — usa DuckDB con la extensión sqlite. Tipado estricto. Es el
+      motor que se usa luego para SQL/PGQ.
+    - "sqlite" — usa el módulo sqlite3 de la stdlib. Tipado laxo. Es el motor
+      que la literatura de Spider usa por convención.
+    """
+    if engine == "duckdb":
+        return _execute_duckdb(db_root, db_id, sql)
+    if engine == "sqlite":
+        return _execute_sqlite(db_root, db_id, sql)
+    raise ValueError(f"engine debe ser 'duckdb' o 'sqlite', no {engine!r}")
+
+
+def _execute_duckdb(db_root: Path, db_id: str, sql: str) -> tuple[bool, str | None]:
     sqlite_path = db_root / db_id / f"{db_id}.sqlite"
     try:
         con = duckdb.connect(":memory:")
@@ -94,6 +114,19 @@ def execute_on_db(db_root: Path, db_id: str, sql: str) -> tuple[bool, str | None
         con.execute(f"ATTACH '{sqlite_path}' AS spider_db (TYPE sqlite)")
         con.execute("USE spider_db")
         con.execute(sql).fetchall()
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _execute_sqlite(db_root: Path, db_id: str, sql: str) -> tuple[bool, str | None]:
+    sqlite_path = db_root / db_id / f"{db_id}.sqlite"
+    try:
+        con = sqlite3.connect(str(sqlite_path))
+        try:
+            con.execute(sql).fetchall()
+        finally:
+            con.close()
         return True, None
     except Exception as exc:
         return False, str(exc)
