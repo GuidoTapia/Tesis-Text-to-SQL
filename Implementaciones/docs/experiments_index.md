@@ -18,6 +18,7 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 03 | ¿cuánto del error rate viene del motor estricto vs del LLM? | 100 (predicciones reusadas de 02) | 6 | sqlite3 | 98/100 ejecutan; DuckDB resulta ser superset estricto (+8 fallos) | 0,00 |
 | 04 | ¿el verificador detecta alucinaciones cuando ocurren? | 15 adv. + 5 control | 3 | sqlite3 | 1/1 alucinación real atrapada; 0 falsos positivos en controles | 0,008 |
 | 05 | ¿el cierre estructural funciona? LLM emite IR vía tool use, ya no puede emitir SQL libre | 15 adv. + 5 control | 3 | sqlite3 | 3/3 alucinaciones atrapadas por verifier estructural antes de compilar; 0 prosa; 0 falsos positivos | 0,10 |
+| 06 | ¿el prompt caching del schema baja el costo? | 15 adv. + 5 control | 3 | sqlite3 | implementación correcta pero la cuenta/tier no activa el caching; cache_creation y cache_read en 0 | 0,11 |
 
 ## Configuración detallada
 
@@ -28,6 +29,7 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 03 | `evaluation/run_experiment_03.py` | `runs/experiment_03_*.json` | (no llama al LLM) | 42 (heredado) | sqlite3 stdlib | Reutiliza exactamente las predicciones de la corrida 02 más reciente; aísla el efecto del motor |
 | 04 | `evaluation/run_experiment_04.py` | `runs/experiment_04_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Corpus fijo en `corpus/adversarial/spider_decoys.json`; 15 adversariales + 5 controles |
 | 05 | `evaluation/run_experiment_05.py` | `runs/experiment_05_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Mismo corpus que 04. LLM forzado a tool use con `input_schema = IR_TOOL_INPUT_SCHEMA` (~9 KB). Pipeline: tool_call → parse_ir → verify_ir → compile_query → execute_on_db |
+| 06 | `evaluation/run_experiment_06.py` | `runs/experiment_06_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Mismo flujo que 05 con `cache_control` en la definición del tool; el ahorro esperado no se materializó por limitación a nivel de cuenta/tier (ver lab notebook) |
 
 ## Tiempo y consumo
 
@@ -38,7 +40,8 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 03 | 0 | 0 | 0 | ~3 s | 0,00 |
 | 04 | 20 | 5 944 | 893 | 25,2 s | 0,008 |
 | 05 | 20 | 94 964 | 7 231 | 44,5 s | 0,10 |
-| Total | 160 | 137 605 | 13 120 | ~213 s | ~0,17 |
+| 06 | 20 | 94 964 | 7 675 | 48,0 s | 0,11 |
+| Total | 180 | 232 569 | 20 795 | ~261 s | ~0,28 |
 
 ## Detalle por experimento
 
