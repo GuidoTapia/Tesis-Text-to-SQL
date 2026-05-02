@@ -193,12 +193,23 @@ def test_compile_hybrid_query_with_external_filter() -> None:
 
 @pytest.fixture(scope="module")
 def graph_db() -> duckdb.DuckDBPyConnection:
-    """Levanta un property graph mínimo en DuckDB para los tests de ejecución."""
+    """Levanta un property graph mínimo en DuckDB para los tests de ejecución.
+
+    El esquema incluye columnas de propiedad (age, country) en ``Person`` que
+    no se exponen como vértices/aristas del grafo pero sí están disponibles
+    para la composición híbrida (JOIN del resultado del MATCH con la tabla
+    relacional).
+    """
     con = duckdb.connect(":memory:")
     con.execute("INSTALL duckpgq FROM community")
     con.execute("LOAD duckpgq")
-    con.execute("CREATE TABLE Person (id INTEGER, name VARCHAR)")
-    con.execute("INSERT INTO Person VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Carol')")
+    con.execute(
+        "CREATE TABLE Person (id INTEGER, name VARCHAR, age INTEGER, country VARCHAR)"
+    )
+    con.execute(
+        "INSERT INTO Person VALUES "
+        "(1, 'Alice', 30, 'AR'), (2, 'Bob', 22, 'BR'), (3, 'Carol', 45, 'AR')"
+    )
     con.execute("CREATE TABLE Knows (p1 INTEGER, p2 INTEGER)")
     con.execute("INSERT INTO Knows VALUES (1, 2), (2, 3)")
     con.execute(
@@ -268,3 +279,85 @@ def test_execute_hybrid_external_filter(graph_db) -> None:
     sql = compile_query(q)
     rows = graph_db.execute(sql).fetchall()
     assert rows == [("Bob",)]
+
+
+# ---------------------------------------------------------------------------
+# Stress de composición híbrida — JOIN entre GRAPH_TABLE y tabla relacional
+# ---------------------------------------------------------------------------
+
+
+def _knows_match_with_ids() -> MatchPattern:
+    """Variante de ``_knows_match`` que también expone los ids como columnas
+    para permitir el JOIN con la tabla relacional ``Person``."""
+    from core.ir import EdgePattern, PathPattern, VertexPattern
+
+    return MatchPattern(
+        graph="test_graph",
+        patterns=(
+            PathPattern(
+                head=VertexPattern(var="a", label="Person"),
+                steps=(
+                    (
+                        EdgePattern(var="k", label="knows", direction="->"),
+                        VertexPattern(var="b", label="Person"),
+                    ),
+                ),
+            ),
+        ),
+        columns=(
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="a")),
+                alias="src",
+            ),
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="b")),
+                alias="dst",
+            ),
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="id", qualifier="a")),
+                alias="src_id",
+            ),
+        ),
+    )
+
+
+def _hybrid_join_query() -> RelationalQuery:
+    """Caso canónico de HybridComposition: el resultado de un GRAPH_TABLE
+    participa en un JOIN con una tabla relacional, y el WHERE filtra por una
+    propiedad presente solo en la tabla relacional (``age``)."""
+    from core.ir import Join
+
+    return RelationalQuery(
+        select=(
+            SelectItem(expr=ColumnExpr(ref=ColumnRef(name="src", qualifier="g"))),
+            SelectItem(expr=ColumnExpr(ref=ColumnRef(name="dst", qualifier="g"))),
+            SelectItem(expr=ColumnExpr(ref=ColumnRef(name="age", qualifier="p"))),
+            SelectItem(expr=ColumnExpr(ref=ColumnRef(name="country", qualifier="p"))),
+        ),
+        from_=Join(
+            left=FromGraphMatch(match=_knows_match_with_ids(), alias="g"),
+            right=FromTable(table=TableRef(name="Person", alias="p")),
+            kind="INNER",
+            on=BinaryOp(
+                op="=",
+                left=ColumnExpr(ref=ColumnRef(name="src_id", qualifier="g")),
+                right=ColumnExpr(ref=ColumnRef(name="id", qualifier="p")),
+            ),
+        ),
+        where=BinaryOp(
+            op=">",
+            left=ColumnExpr(ref=ColumnRef(name="age", qualifier="p")),
+            right=Literal(value=25, raw="25"),
+        ),
+    )
+
+
+def test_execute_hybrid_join_with_relational_table(graph_db) -> None:
+    """El caso híbrido canónico: relacionar resultados del MATCH con datos
+    de una tabla relacional vía JOIN, filtrando por columnas que solo
+    existen en la tabla relacional."""
+    sql = compile_query(_hybrid_join_query())
+    rows = graph_db.execute(sql).fetchall()
+    # Alice (id=1) tiene age=30 (>25) y conoce a Bob; Carol no conoce a nadie
+    # como source. Bob (id=2) tiene age=22 (<25), filtrado.
+    assert rows == [("Alice", "Bob", 30, "AR")]

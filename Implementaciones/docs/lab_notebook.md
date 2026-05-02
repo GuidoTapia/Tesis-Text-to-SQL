@@ -82,6 +82,16 @@ Segundo, el verificador estático sigue sin tener oportunidad de demostrar utili
 
 Tercero, Claude Haiku 4.5 obtiene 90% de execution accuracy zero-shot en este sample, por encima del 80–85% típico reportado para baselines similares en Spider dev. El número no es estrictamente comparable por el problema de data quality recién mencionado, pero sirve como ancla.
 
+### Stress de la composición híbrida
+
+Antes de avanzar a la rebanada cinco se evaluó la eficacia del verificador estructural sobre el caso híbrido canónico, donde el resultado de un GRAPH_TABLE participa en un JOIN con una tabla relacional. La preocupación legítima es que el verificador, aunque cubre las tres clases declaradas en el cap. 4, podría fallar en queries que mezclan scopes de grafo y relacional en una misma cláusula.
+
+Se extendió el fixture de DuckDB para incluir columnas de propiedad (age, country) en la tabla Person, agregando una dimensión que solo existe del lado relacional y que el JOIN tiene que poder usar. Sobre ese fixture se construyó por mano el caso canónico: un MATCH expone src, dst e id de la fuente; el JOIN enlaza el id con Person.id; el WHERE filtra por p.age > 25. La query ejecuta correctamente en DuckDB y devuelve la fila esperada.
+
+Sobre el verificador se diseñaron cinco tests de stress. El primero confirma que la query híbrida válida no produce errores; los tres siguientes mutan deliberadamente la query para introducir alucinaciones del lado relacional (p.salary), del lado del alias del grafo (g.nonexistent) y del lado de las propiedades del vértice dentro del MATCH (a.email), y verifican que el verificador detecta cada una con el mensaje correcto. El último confirma que el WHERE externo puede referenciar columnas declaradas en COLUMNS del bloque GRAPH_TABLE sin generar falsos positivos.
+
+Con esto queda demostrado que el sistema de scopes encadenados del verificador resuelve correctamente las tres procedencias de un identificador en una query híbrida (alias relacional, alias del bloque de grafo, variable de vértice ligada dentro del MATCH) y que la verificación es ejecutable sobre composiciones más complejas que la pareja relacional pura plus pareja graph pura.
+
 ### Paso 5c — segundo motor de ejecución y línea base comparable
 
 Se eligió la opción D para resolver la cuestión del manejo de data sucia en Spider: agregar un segundo backend de ejecución basado en `sqlite3` de la stdlib y dejar DuckDB para SQL/PGQ donde el motor estricto es necesario y la data es nuestra. El verificador queda intacto porque opera sobre el SQL y el esquema, no sobre el motor.

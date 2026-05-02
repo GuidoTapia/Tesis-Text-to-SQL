@@ -92,6 +92,8 @@ SCHEMA_PERSON_GRAPH = ProjectedSchema(
                 columns=(
                     ColumnSchema(name="id", type="INTEGER", is_primary_key=True),
                     ColumnSchema(name="name", type="TEXT"),
+                    ColumnSchema(name="age", type="INTEGER"),
+                    ColumnSchema(name="country", type="TEXT"),
                 ),
             ),
             TableSchema(
@@ -307,6 +309,171 @@ def test_unknown_vertex_property_detected() -> None:
 # ---------------------------------------------------------------------------
 # Clase de coherencia cruzada
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Stress de composición híbrida — verificador sobre JOIN de GRAPH_TABLE y
+# tabla relacional. El criterio de eficacia es triple: el verificador (a) no
+# falsamente flagea un híbrido válido, (b) detecta hallucinations en el lado
+# del grafo y (c) detecta hallucinations en el lado relacional.
+# ---------------------------------------------------------------------------
+
+
+def _hybrid_match() -> MatchPattern:
+    """MATCH que expone ``a.id`` como ``src_id`` para enlazar luego con la
+    tabla relacional ``Person``."""
+    return MatchPattern(
+        graph="test_graph",
+        patterns=(
+            PathPattern(
+                head=VertexPattern(var="a", label="Person"),
+                steps=(
+                    (
+                        EdgePattern(var="k", label="knows", direction="->"),
+                        VertexPattern(var="b", label="Person"),
+                    ),
+                ),
+            ),
+        ),
+        columns=(
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="a")),
+                alias="src",
+            ),
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="b")),
+                alias="dst",
+            ),
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="id", qualifier="a")),
+                alias="src_id",
+            ),
+        ),
+    )
+
+
+def _hybrid_join_query(
+    match: MatchPattern | None = None,
+    where_col: tuple[str, str] = ("p", "age"),
+) -> RelationalQuery:
+    from core.ir import Join
+
+    return RelationalQuery(
+        select=(
+            SelectItem(expr=ColumnExpr(ref=ColumnRef(name="src", qualifier="g"))),
+            SelectItem(expr=ColumnExpr(ref=ColumnRef(name="age", qualifier="p"))),
+        ),
+        from_=Join(
+            left=FromGraphMatch(match=match or _hybrid_match(), alias="g"),
+            right=FromTable(table=TableRef(name="Person", alias="p")),
+            kind="INNER",
+            on=BinaryOp(
+                op="=",
+                left=ColumnExpr(ref=ColumnRef(name="src_id", qualifier="g")),
+                right=ColumnExpr(ref=ColumnRef(name="id", qualifier="p")),
+            ),
+        ),
+        where=BinaryOp(
+            op=">",
+            left=ColumnExpr(
+                ref=ColumnRef(name=where_col[1], qualifier=where_col[0])
+            ),
+            right=Literal(value=25, raw="25"),
+        ),
+    )
+
+
+def test_hybrid_valid_no_errors() -> None:
+    """El verificador no debe rechazar una composición híbrida bien formada,
+    aun cuando el WHERE referencia una columna que solo existe del lado
+    relacional (``p.age``)."""
+    errors = verify_ir(_hybrid_join_query(), SCHEMA_PERSON_GRAPH)
+    assert errors == [], f"esperaba cero errores, obtuve {errors}"
+
+
+def test_hybrid_relational_column_hallucination_detected() -> None:
+    """El WHERE referencia ``p.salary`` que no existe en Person."""
+    q = _hybrid_join_query(where_col=("p", "salary"))
+    errors = verify_ir(q, SCHEMA_PERSON_GRAPH)
+    assert any(
+        e.kind == "unknown_column" and "salary" in e.message for e in errors
+    )
+
+
+def test_hybrid_graph_alias_hallucination_detected() -> None:
+    """El SELECT referencia ``g.nonexistent`` — columna no declarada en
+    COLUMNS del bloque GRAPH_TABLE."""
+    from core.ir import Join
+
+    q = RelationalQuery(
+        select=(
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="nonexistent", qualifier="g"))
+            ),
+        ),
+        from_=Join(
+            left=FromGraphMatch(match=_hybrid_match(), alias="g"),
+            right=FromTable(table=TableRef(name="Person", alias="p")),
+            kind="INNER",
+            on=BinaryOp(
+                op="=",
+                left=ColumnExpr(ref=ColumnRef(name="src_id", qualifier="g")),
+                right=ColumnExpr(ref=ColumnRef(name="id", qualifier="p")),
+            ),
+        ),
+    )
+    errors = verify_ir(q, SCHEMA_PERSON_GRAPH)
+    assert any(
+        e.kind == "unknown_column" and "nonexistent" in e.message for e in errors
+    )
+
+
+def test_hybrid_vertex_property_hallucination_detected() -> None:
+    """Dentro del MATCH, COLUMNS expone ``a.email`` — propiedad inexistente
+    en el backing table del label Person."""
+    bad_match = replace(
+        _hybrid_match(),
+        columns=(
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="email", qualifier="a")),
+                alias="src_email",
+            ),
+        ),
+    )
+    q = _hybrid_join_query(match=bad_match)
+    errors = verify_ir(q, SCHEMA_PERSON_GRAPH)
+    assert any(
+        e.kind == "unknown_column" and "email" in e.message for e in errors
+    )
+
+
+def test_hybrid_where_uses_graph_alias_column() -> None:
+    """El verificador debe permitir referencias a columnas declaradas en
+    COLUMNS del MATCH desde el WHERE relacional externo."""
+    from core.ir import Join
+
+    q = RelationalQuery(
+        select=(
+            SelectItem(expr=ColumnExpr(ref=ColumnRef(name="src", qualifier="g"))),
+        ),
+        from_=Join(
+            left=FromGraphMatch(match=_hybrid_match(), alias="g"),
+            right=FromTable(table=TableRef(name="Person", alias="p")),
+            kind="INNER",
+            on=BinaryOp(
+                op="=",
+                left=ColumnExpr(ref=ColumnRef(name="src_id", qualifier="g")),
+                right=ColumnExpr(ref=ColumnRef(name="id", qualifier="p")),
+            ),
+        ),
+        where=BinaryOp(
+            op="=",
+            left=ColumnExpr(ref=ColumnRef(name="dst", qualifier="g")),
+            right=Literal(value="Carol", raw="'Carol'"),
+        ),
+    )
+    errors = verify_ir(q, SCHEMA_PERSON_GRAPH)
+    assert errors == []
 
 
 def test_vertex_label_without_table_detected() -> None:
