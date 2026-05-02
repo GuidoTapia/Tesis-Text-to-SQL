@@ -87,3 +87,71 @@ def from_spider_tables(tables_json_path: Path, db_id: str) -> RelationalSchema:
         for i, name in enumerate(table_names)
     )
     return RelationalSchema(tables=tables)
+
+
+# ---------------------------------------------------------------------------
+# Esquema de grafo de propiedad y esquema proyectado
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PropertyGraphVertexTable:
+    """Una declaración ``VERTEX TABLES (Person)`` enlaza un label de vértice
+    con una tabla relacional. Es el puente que la coherencia cruzada chequea."""
+
+    label: str
+    table: str
+    key_columns: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PropertyGraphEdgeTable:
+    label: str
+    table: str
+    source_label: str
+    destination_label: str
+    source_key: tuple[str, ...] = ()
+    destination_key: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PropertyGraphSchema:
+    """Declaración de un property graph como la registra DuckPGQ en su catálogo."""
+
+    name: str
+    vertex_tables: tuple[PropertyGraphVertexTable, ...]
+    edge_tables: tuple[PropertyGraphEdgeTable, ...]
+
+    def find_vertex_label(self, label: str) -> Optional[PropertyGraphVertexTable]:
+        target = label.lower()
+        for v in self.vertex_tables:
+            if v.label.lower() == target:
+                return v
+        return None
+
+    def find_edge_label(self, label: str) -> Optional[PropertyGraphEdgeTable]:
+        target = label.lower()
+        for e in self.edge_tables:
+            if e.label.lower() == target:
+                return e
+        return None
+
+
+@dataclass(frozen=True)
+class ProjectedSchema:
+    """Σ_proj de la tesis (cap. 4 §4.5.1).
+
+    Combina el esquema relacional y los grafos de propiedad declarados. Es el
+    único contexto estructural que el verificador consume para resolver
+    referencias.
+    """
+
+    relational: RelationalSchema
+    graphs: tuple[PropertyGraphSchema, ...] = ()
+
+    def find_graph(self, name: str) -> Optional[PropertyGraphSchema]:
+        target = name.lower()
+        for g in self.graphs:
+            if g.name.lower() == target:
+                return g
+        return None
