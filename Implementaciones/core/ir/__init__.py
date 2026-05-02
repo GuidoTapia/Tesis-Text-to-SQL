@@ -6,6 +6,7 @@ que el resto del proyecto consuma la API estable desde ``core.ir``.
 
 from .compile import compile_query
 from .lift import lift_sql
+from .parse import IRParseError, parse_ir, to_dict
 from .nodes import (
     Aggregate,
     BetweenExpr,
@@ -80,4 +81,7 @@ __all__ = [
     "VertexPattern",
     "compile_query",
     "lift_sql",
+    "IRParseError",
+    "parse_ir",
+    "to_dict",
 ]
