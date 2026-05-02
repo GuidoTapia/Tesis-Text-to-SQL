@@ -17,6 +17,7 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 02 | ¿escala a más preguntas y bases? ¿qué tipos de error aparecen? | 100 | 6 | DuckDB | 90/100 ejecutan; 0/10 detectados; 5 de 10 son data-quality | 0,049 |
 | 03 | ¿cuánto del error rate viene del motor estricto vs del LLM? | 100 (predicciones reusadas de 02) | 6 | sqlite3 | 98/100 ejecutan; DuckDB resulta ser superset estricto (+8 fallos) | 0,00 |
 | 04 | ¿el verificador detecta alucinaciones cuando ocurren? | 15 adv. + 5 control | 3 | sqlite3 | 1/1 alucinación real atrapada; 0 falsos positivos en controles | 0,008 |
+| 05 | ¿el cierre estructural funciona? LLM emite IR vía tool use, ya no puede emitir SQL libre | 15 adv. + 5 control | 3 | sqlite3 | 3/3 alucinaciones atrapadas por verifier estructural antes de compilar; 0 prosa; 0 falsos positivos | 0,10 |
 
 ## Configuración detallada
 
@@ -26,6 +27,7 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 02 | `evaluation/run_experiment_02.py` | `runs/experiment_02_*.json` | claude-haiku-4-5-20251001 | 42 | DuckDB 1.4.4 + ext. `duckpgq` | `temperature=0` para reproducibilidad; helpers compartidos vía `evaluation/_helpers.py` |
 | 03 | `evaluation/run_experiment_03.py` | `runs/experiment_03_*.json` | (no llama al LLM) | 42 (heredado) | sqlite3 stdlib | Reutiliza exactamente las predicciones de la corrida 02 más reciente; aísla el efecto del motor |
 | 04 | `evaluation/run_experiment_04.py` | `runs/experiment_04_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Corpus fijo en `corpus/adversarial/spider_decoys.json`; 15 adversariales + 5 controles |
+| 05 | `evaluation/run_experiment_05.py` | `runs/experiment_05_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Mismo corpus que 04. LLM forzado a tool use con `input_schema = IR_TOOL_INPUT_SCHEMA` (~9 KB). Pipeline: tool_call → parse_ir → verify_ir → compile_query → execute_on_db |
 
 ## Tiempo y consumo
 
@@ -35,7 +37,8 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 02 | 100 | 36 697 | 4 996 | 111,2 s | 0,049 |
 | 03 | 0 | 0 | 0 | ~3 s | 0,00 |
 | 04 | 20 | 5 944 | 893 | 25,2 s | 0,008 |
-| Total | 140 | 42 641 | 5 889 | ~169 s | ~0,07 |
+| 05 | 20 | 94 964 | 7 231 | 44,5 s | 0,10 |
+| Total | 160 | 137 605 | 13 120 | ~213 s | ~0,17 |
 
 ## Detalle por experimento
 
@@ -169,6 +172,42 @@ La diferencia entre "LLM alucinó" (1) y "verificador flageó" (4) requiere aná
 **Lectura para la tesis**. La hipótesis implícita del verificador (LLMs alucinan con frecuencia y conviene atraparlos antes de ejecutar) **no se sostiene en este régimen**. Haiku 4.5 con esquema explícito prefiere reformular, devolver NULL o rehusarse en prosa antes que inventar nombres. La contribución del verificador se entiende mejor como una **garantía estructural de soundness** (cuando el SQL pasa la verificación, está garantizado que solo referencia nombres del esquema), más cercana a un type-checker que a un detector estadístico. La métrica natural deja de ser la tasa de detección y pasa a ser una propiedad cualitativa.
 
 **Commit asociado**: [486a5ba] feat: corpus adversarial mínimo y experimento de evaluación del verificador.
+
+---
+
+### Experimento 05 — cierre estructural vía tool use
+
+**Pregunta**. Si el LLM no puede emitir SQL libre y su única salida válida es una IR estructural (vía tool use de Anthropic con `input_schema = IR_TOOL_INPUT_SCHEMA`), ¿qué tasa de alucinación detectada estructuralmente alcanza el pipeline sobre el mismo corpus adversarial del experimento 04?
+
+**Diseño**. Mismo corpus que el experimento 04 (`corpus/adversarial/spider_decoys.json`, 15 adversariales + 5 controles, mismas tres bases de Spider). El LLM ya no recibe instrucción de devolver SQL como texto: se le da un tool `submit_query` cuyo `input_schema` es el JSON Schema de la IR-SQL/PGQ. El SDK rechaza payloads que no respetan el schema. El payload aceptado se convierte a IR con `parse_ir`, se verifica con `verify_ir`, se compila con `compile_query` y se ejecuta sobre sqlite3.
+
+**Pipeline y puntos de fallo**. Cada predicción atraviesa cinco etapas y queda registrada por la primera que falla: `llm_call`, `no_tool_call`, `parse`, `verifier`, `compile`, `execution`. Esa categorización permite separar fallos del modelo, fallos del schema, fallos de la IR estructural, fallos del compilador y fallos semánticos.
+
+**Resultado**.
+
+| Etapa donde se detuvo | Adversariales | Controles |
+|---|---:|---:|
+| (éxito completo, ejecuta) | 9 | 5 |
+| `verifier` | 3 | 0 |
+| `execution` | 3 | 0 |
+
+Las tres alucinaciones que el verificador atrapó (`email` en concert_singer, `Transmission` en car_1, `racket_brand` en wta_1) son las primeras detecciones genuinas a nivel estructural en todo el proyecto. Los tres errores de ejecución son de data quality (UTF-8 mal codificado en `players.last_name`), no de la IR.
+
+**Comparación con el experimento 04**.
+
+| Aspecto | Exp 04 (LLM emite SQL) | Exp 05 (LLM emite IR vía tool) |
+|---|---|---|
+| Salida malformada (prosa, markdown) | 3/15 adversariales | 0/15 |
+| Alucinaciones de nombre en la salida | 1/15 (atrapada por sqlite) | 3/15 (atrapadas por verifier) |
+| Tasa de detección estática | 100% (1/1) — sin oportunidad real | 100% (3/3) — con oportunidad estructural |
+| Falsos positivos sobre controles | 0/5 | 0/5 |
+| Tokens de entrada totales | 5 944 | 94 964 |
+
+**Lectura**. El cierre estructural del cap. 4 se materializa: el LLM no puede emitir SQL inválido porque no emite SQL — emite IR cuyo formato la SDK valida y cuyo contenido el verificador valida. Las alucinaciones igual ocurren (el modelo se compromete con un nombre concreto cuando antes podía esquivar con prosa) pero ahora son detectables al cien por ciento antes de la compilación. La métrica natural deja de ser "tasa de execution accuracy" y pasa a ser "fracción de la salida que sobrevive a la verificación estructural", que es lo que el cap. 4 promete como propiedad de soundness.
+
+**Costo y consideración futura**. El costo por pregunta es 12× el del experimento 04 porque el `input_schema` (~9 KB) viaja en cada llamada. La técnica natural de mitigación es prompt caching de Anthropic, que reduciría el costo del schema a una fracción del primer hit; por simplicidad de la rebanada inicial, no se incluyó.
+
+**Commit asociado**: [próximo commit] feat: experimento 05 con tool use sobre IR.
 
 ---
 
