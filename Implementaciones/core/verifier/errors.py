@@ -33,6 +33,7 @@ class VerificationError:
 
     Clase de coherencia cruzada:
         - ``vertex_label_without_table``
+        - ``path_step_incoherent``
     """
 
     kind: str

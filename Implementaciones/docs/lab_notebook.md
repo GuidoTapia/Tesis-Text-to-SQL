@@ -136,6 +136,18 @@ Hallazgo de extensión del verificador. La falla de adv-08 expone una clase de c
 
 Lectura para la tesis. La rebanada siete demuestra que el cierre estructural del cap. 4 funciona también sobre la dimensión grafo, no solo sobre la relacional. Los cinco de diez adversariales atrapados por el verificador y los cero falsos positivos sobre los cinco controles son números honestos que sostienen la propiedad de soundness sobre el caso de grafo. El hallazgo del modo de fallo en adv-08 (PathPattern multihop incoherente) es valor adicional: identifica una extensión concreta y ejecutable del verificador que el cap. 4 no había explicitado y que esta rebanada motiva como trabajo futuro inmediato.
 
+### Rebanada ocho — coherencia de path multihop
+
+Se implementó la cuarta clase de chequeo motivada por el adv-08 del experimento siete. El verificador estructural ahora valida, en cada step de un PathPattern, que el label del vértice precedente coincida con el source_label declarado por la arista y que el label del vértice siguiente coincida con el destination_label, contemplando la dirección del edge. La clase nueva se llama path_step_incoherent y se enumera junto a vertex_label_without_table dentro de la familia de coherencia cruzada.
+
+La implementación vive en core.verifier.structural._check_path_step_coherence, invocada por _bind_from_graph_match al recorrer cada par (edge, vertex) del PathPattern. La función mantiene una referencia al vertex anterior y compara su label contra el edge_decl que viene del PropertyGraphSchema. Tres direcciones soportadas: -> exige source_label en el prev y destination_label en el next; <- exige el orden inverso; - acepta cualquiera de las dos orientaciones. El chequeo se omite cuando falta información para razonar (grafo no encontrado, edge label inexistente, vértice sin label anotado) para no agregar ruido al reporte cuando ya hay otros errores reportados sobre la misma posición.
+
+Se cubrió la lógica con seis tests unitarios sobre paths coherentes e incoherentes en cada dirección, incluyendo el caso multihop exacto del adv-08 y el caso permisivo del edge no dirigido.
+
+Re-corrida del experimento siete con el verificador extendido. La adversarial adv-08, que antes pasaba por el verificador y fallaba en ejecución con el binder error de DuckDB, ahora es atrapada con un mensaje preciso: "path step (company:Company)->[e3:lives_in]->(city:City) incompatible con la declaración: lives_in es Person → City". La cantidad de adversariales atrapadas por el verificador subió de cinco a seis sobre diez; las execution failures bajaron de uno a cero; los controles siguen ejecutando limpiamente cinco de cinco. El verificador ahora cubre todas las clases de error que el experimento siete había expuesto.
+
+Lectura para la tesis. La rebanada ocho cierra el ciclo iterativo motivado por la rebanada siete: una observación empírica del experimento (un modo de fallo del LLM no contemplado por el cap. 4) se traduce en una extensión concreta del verificador estructural que se valida en el mismo experimento. La cuarta clase de chequeo es una contribución natural al diseño que el cap. 4 puede ahora declarar, complementaria a las tres originales (referencial, tipos, coherencia cruzada relacional↔grafo) y específica del régimen híbrido con paths multihop.
+
 ### Paso 5c — segundo motor de ejecución y línea base comparable
 
 Se eligió la opción D para resolver la cuestión del manejo de data sucia en Spider: agregar un segundo backend de ejecución basado en `sqlite3` de la stdlib y dejar DuckDB para SQL/PGQ donde el motor estricto es necesario y la data es nuestra. El verificador queda intacto porque opera sobre el SQL y el esquema, no sobre el motor.

@@ -476,6 +476,260 @@ def test_hybrid_where_uses_graph_alias_column() -> None:
     assert errors == []
 
 
+# ---------------------------------------------------------------------------
+# Cuarta clase: coherencia de path multihop (rebanada 8)
+# ---------------------------------------------------------------------------
+
+
+def _social_schema_for_path_tests() -> ProjectedSchema:
+    """Esquema con tres labels de vértice y tres labels de arista, suficiente
+    para construir paths coherentes e incoherentes en distintas direcciones."""
+    return ProjectedSchema(
+        relational=RelationalSchema(
+            tables=(
+                TableSchema(
+                    name="Person",
+                    columns=(
+                        ColumnSchema(name="id", type="INTEGER", is_primary_key=True),
+                        ColumnSchema(name="name", type="TEXT"),
+                    ),
+                ),
+                TableSchema(
+                    name="City",
+                    columns=(
+                        ColumnSchema(name="id", type="INTEGER", is_primary_key=True),
+                        ColumnSchema(name="name", type="TEXT"),
+                    ),
+                ),
+                TableSchema(
+                    name="Company",
+                    columns=(
+                        ColumnSchema(name="id", type="INTEGER", is_primary_key=True),
+                        ColumnSchema(name="name", type="TEXT"),
+                    ),
+                ),
+                TableSchema(
+                    name="Knows",
+                    columns=(
+                        ColumnSchema(name="p1", type="INTEGER"),
+                        ColumnSchema(name="p2", type="INTEGER"),
+                    ),
+                ),
+                TableSchema(
+                    name="LivesIn",
+                    columns=(
+                        ColumnSchema(name="person_id", type="INTEGER"),
+                        ColumnSchema(name="city_id", type="INTEGER"),
+                    ),
+                ),
+                TableSchema(
+                    name="WorksAt",
+                    columns=(
+                        ColumnSchema(name="person_id", type="INTEGER"),
+                        ColumnSchema(name="company_id", type="INTEGER"),
+                    ),
+                ),
+            )
+        ),
+        graphs=(
+            PropertyGraphSchema(
+                name="g",
+                vertex_tables=(
+                    PropertyGraphVertexTable(label="Person", table="Person"),
+                    PropertyGraphVertexTable(label="City", table="City"),
+                    PropertyGraphVertexTable(label="Company", table="Company"),
+                ),
+                edge_tables=(
+                    PropertyGraphEdgeTable(
+                        label="knows", table="Knows",
+                        source_label="Person", destination_label="Person",
+                    ),
+                    PropertyGraphEdgeTable(
+                        label="lives_in", table="LivesIn",
+                        source_label="Person", destination_label="City",
+                    ),
+                    PropertyGraphEdgeTable(
+                        label="works_at", table="WorksAt",
+                        source_label="Person", destination_label="Company",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
+def _make_match_with_path(steps: tuple) -> RelationalQuery:
+    """Construye un RelationalQuery con un único MatchPattern de un path,
+    útil para probar la coherencia step a step."""
+    head = VertexPattern(var="v0", label="Person")
+    p = PathPattern(head=head, steps=steps)
+    m = MatchPattern(
+        graph="g",
+        patterns=(p,),
+        columns=(
+            SelectItem(
+                expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="v0")),
+                alias="x",
+            ),
+        ),
+    )
+    return RelationalQuery(
+        select=(SelectItem(expr=Star()),),
+        from_=FromGraphMatch(match=m, alias="g"),
+    )
+
+
+def test_path_step_coherent_forward_no_error() -> None:
+    """``(Person)-[lives_in]->(City)`` matchea la declaración."""
+    q = _make_match_with_path(
+        (
+            (
+                EdgePattern(var="e", label="lives_in", direction="->"),
+                VertexPattern(var="v1", label="City"),
+            ),
+        )
+    )
+    errors = verify_ir(q, _social_schema_for_path_tests())
+    assert [e for e in errors if e.kind == "path_step_incoherent"] == []
+
+
+def test_path_step_coherent_backward_no_error() -> None:
+    """``(City)<-[lives_in]-(Person)`` también es válido por la inversión."""
+    head_q = RelationalQuery(
+        select=(SelectItem(expr=Star()),),
+        from_=FromGraphMatch(
+            match=MatchPattern(
+                graph="g",
+                patterns=(
+                    PathPattern(
+                        head=VertexPattern(var="c", label="City"),
+                        steps=(
+                            (
+                                EdgePattern(var="e", label="lives_in", direction="<-"),
+                                VertexPattern(var="p", label="Person"),
+                            ),
+                        ),
+                    ),
+                ),
+                columns=(
+                    SelectItem(
+                        expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="c")),
+                        alias="city",
+                    ),
+                ),
+            ),
+            alias="g",
+        ),
+    )
+    errors = verify_ir(head_q, _social_schema_for_path_tests())
+    assert [e for e in errors if e.kind == "path_step_incoherent"] == []
+
+
+def test_path_step_incoherent_detected() -> None:
+    """``(City)-[lives_in]->(Person)`` invierte source y destination en
+    dirección forward — debe ser detectado."""
+    head_q = RelationalQuery(
+        select=(SelectItem(expr=Star()),),
+        from_=FromGraphMatch(
+            match=MatchPattern(
+                graph="g",
+                patterns=(
+                    PathPattern(
+                        head=VertexPattern(var="c", label="City"),
+                        steps=(
+                            (
+                                EdgePattern(var="e", label="lives_in", direction="->"),
+                                VertexPattern(var="p", label="Person"),
+                            ),
+                        ),
+                    ),
+                ),
+                columns=(
+                    SelectItem(
+                        expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="c")),
+                    ),
+                ),
+            ),
+            alias="g",
+        ),
+    )
+    errors = verify_ir(head_q, _social_schema_for_path_tests())
+    assert any(e.kind == "path_step_incoherent" for e in errors), (
+        f"esperaba path_step_incoherent en {[e.kind for e in errors]}"
+    )
+
+
+def test_path_step_undirected_either_orientation_accepted() -> None:
+    """Edge declarado con dirección ``-`` acepta cualquiera de los dos
+    órdenes."""
+    coherent_a = _make_match_with_path(
+        (
+            (
+                EdgePattern(var="e", label="knows", direction="-"),
+                VertexPattern(var="v1", label="Person"),
+            ),
+        )
+    )
+    errors = verify_ir(coherent_a, _social_schema_for_path_tests())
+    assert [e for e in errors if e.kind == "path_step_incoherent"] == []
+
+
+def test_path_step_multihop_with_incoherent_middle_step() -> None:
+    """Reproduce exactamente el caso adv-08 del experimento siete:
+    ``(Person)-[works_at]->(Company)-[lives_in]->(City)`` — el segundo
+    step usa lives_in con source Company en lugar de Person."""
+    q = RelationalQuery(
+        select=(SelectItem(expr=Star()),),
+        from_=FromGraphMatch(
+            match=MatchPattern(
+                graph="g",
+                patterns=(
+                    PathPattern(
+                        head=VertexPattern(var="alice", label="Person"),
+                        steps=(
+                            (
+                                EdgePattern(var="e1", label="works_at", direction="->"),
+                                VertexPattern(var="company", label="Company"),
+                            ),
+                            (
+                                EdgePattern(var="e2", label="lives_in", direction="->"),
+                                VertexPattern(var="city", label="City"),
+                            ),
+                        ),
+                    ),
+                ),
+                columns=(
+                    SelectItem(
+                        expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="city")),
+                    ),
+                ),
+            ),
+            alias="g",
+        ),
+    )
+    errors = verify_ir(q, _social_schema_for_path_tests())
+    incoh = [e for e in errors if e.kind == "path_step_incoherent"]
+    assert incoh, "el segundo step debería ser detectado como incoherente"
+    # El primer step es válido (Person → works_at → Company); el segundo no
+    assert len(incoh) == 1
+    assert "lives_in" in incoh[0].message
+
+
+def test_path_step_skips_when_label_missing() -> None:
+    """No emite path_step_incoherent cuando uno de los vértices no tiene label
+    anotado (el chequeo no tiene información para razonar)."""
+    q = _make_match_with_path(
+        (
+            (
+                EdgePattern(var="e", label="lives_in", direction="->"),
+                VertexPattern(var="v1", label=None),  # sin label
+            ),
+        )
+    )
+    errors = verify_ir(q, _social_schema_for_path_tests())
+    assert [e for e in errors if e.kind == "path_step_incoherent"] == []
+
+
 def test_vertex_label_without_table_detected() -> None:
     """El grafo declara un label cuya backing table no existe en el esquema
     relacional. El verificador debe detectar esa incoherencia cuando se usa el

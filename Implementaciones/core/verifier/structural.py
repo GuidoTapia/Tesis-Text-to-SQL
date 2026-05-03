@@ -304,9 +304,12 @@ class StructuralVerifier:
 
         for path in f.match.patterns:
             self._bind_vertex(path.head, graph, match_scope)
+            prev_vertex = path.head
             for edge, vertex in path.steps:
                 self._bind_edge(edge, graph, match_scope)
                 self._bind_vertex(vertex, graph, match_scope)
+                self._check_path_step_coherence(prev_vertex, edge, vertex, graph)
+                prev_vertex = vertex
 
         if f.match.where is not None:
             self._verify_expr(f.match.where, match_scope)
@@ -379,6 +382,70 @@ class StructuralVerifier:
                     message=(
                         f"label de arista {e.label!r} no declarado "
                         f"en el grafo {graph.name!r}"
+                    ),
+                )
+            )
+
+    def _check_path_step_coherence(
+        self,
+        prev_vertex: ir.VertexPattern,
+        edge: ir.EdgePattern,
+        next_vertex: ir.VertexPattern,
+        graph: Optional[PropertyGraphSchema],
+    ) -> None:
+        """Cuarta clase de chequeo (motivada por el experimento siete).
+
+        Verifica que en un step ``(prev_vertex)-[edge]->(next_vertex)`` los
+        labels de los vértices sean compatibles con los ``source_label`` y
+        ``destination_label`` declarados por el edge en el property graph.
+
+        Se omite el chequeo cuando faltan datos para razonar (grafo
+        inexistente, label de arista inexistente, vértice sin label
+        anotado), ya que esos casos quedan reportados por sus chequeos
+        propios y agregar acá ruido empeora el reporte.
+
+        La dirección del edge en la IR controla qué orden se exige:
+
+        - ``->``: prev_vertex.label debe ser source_label, next debe ser destination_label.
+        - ``<-``: prev_vertex.label debe ser destination_label, next debe ser source_label.
+        - ``-`` : cualquiera de las dos orientaciones es aceptable (no dirigido).
+        """
+        if graph is None or edge.label is None:
+            return
+        edge_decl = graph.find_edge_label(edge.label)
+        if edge_decl is None:
+            return
+        if prev_vertex.label is None or next_vertex.label is None:
+            return
+
+        expected_src = edge_decl.source_label.lower()
+        expected_dst = edge_decl.destination_label.lower()
+        actual_prev = prev_vertex.label.lower()
+        actual_next = next_vertex.label.lower()
+
+        forward_ok = (actual_prev == expected_src and actual_next == expected_dst)
+        backward_ok = (actual_prev == expected_dst and actual_next == expected_src)
+
+        if edge.direction == "->":
+            ok = forward_ok
+            arrow = "->"
+        elif edge.direction == "<-":
+            ok = backward_ok
+            arrow = "<-"
+        else:
+            ok = forward_ok or backward_ok
+            arrow = "-"
+
+        if not ok:
+            self.errors.append(
+                VerificationError(
+                    kind="path_step_incoherent",
+                    message=(
+                        f"path step ({prev_vertex.var}:{prev_vertex.label})"
+                        f"{arrow}[{edge.var}:{edge.label}]"
+                        f"{arrow}({next_vertex.var}:{next_vertex.label}) "
+                        f"incompatible con la declaración: {edge.label} es "
+                        f"{edge_decl.source_label} → {edge_decl.destination_label}"
                     ),
                 )
             )
