@@ -19,6 +19,7 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 04 | ¿el verificador detecta alucinaciones cuando ocurren? | 15 adv. + 5 control | 3 | sqlite3 | 1/1 alucinación real atrapada; 0 falsos positivos en controles | 0,008 |
 | 05 | ¿el cierre estructural funciona? LLM emite IR vía tool use, ya no puede emitir SQL libre | 15 adv. + 5 control | 3 | sqlite3 | 3/3 alucinaciones atrapadas por verifier estructural antes de compilar; 0 prosa; 0 falsos positivos | 0,10 |
 | 06 | ¿el prompt caching del schema baja el costo? | 15 adv. + 5 control | 3 | sqlite3 | implementación correcta pero la cuenta/tier no activa el caching; cache_creation y cache_read en 0 | 0,11 |
+| 07 | ¿el cierre estructural funciona sobre IR de grafo? LLM construye queries PGQ vía tool use | 10 adv. + 5 control | grafo `social_graph` | DuckDB+DuckPGQ | 5/10 adversariales atrapadas por verifier; 5/5 controles limpios; 1 modo de fallo nuevo identificado (PathPattern multihop incoherente) | 0,09 |
 
 ## Configuración detallada
 
@@ -30,6 +31,7 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 04 | `evaluation/run_experiment_04.py` | `runs/experiment_04_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Corpus fijo en `corpus/adversarial/spider_decoys.json`; 15 adversariales + 5 controles |
 | 05 | `evaluation/run_experiment_05.py` | `runs/experiment_05_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Mismo corpus que 04. LLM forzado a tool use con `input_schema = IR_TOOL_INPUT_SCHEMA` (~9 KB). Pipeline: tool_call → parse_ir → verify_ir → compile_query → execute_on_db |
 | 06 | `evaluation/run_experiment_06.py` | `runs/experiment_06_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Mismo flujo que 05 con `cache_control` en la definición del tool; el ahorro esperado no se materializó por limitación a nivel de cuenta/tier (ver lab notebook) |
+| 07 | `evaluation/run_experiment_07.py` | `runs/experiment_07_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | DuckDB+DuckPGQ in-memory | Corpus PGQ en `corpus/adversarial/pgq_decoys.json`; grafo `social_graph` con 3 vertex y 3 edge labels creado en el script; pipeline tool_call → parse_ir → verify_ir → compile_query → execute_on_graph_db |
 
 ## Tiempo y consumo
 
@@ -41,7 +43,8 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 04 | 20 | 5 944 | 893 | 25,2 s | 0,008 |
 | 05 | 20 | 94 964 | 7 231 | 44,5 s | 0,10 |
 | 06 | 20 | 94 964 | 7 675 | 48,0 s | 0,11 |
-| Total | 180 | 232 569 | 20 795 | ~261 s | ~0,28 |
+| 07 | 15 | 80 701 | 8 592 | 48,5 s | 0,09 |
+| Total | 195 | 313 270 | 29 387 | ~310 s | ~0,37 |
 
 ## Detalle por experimento
 
