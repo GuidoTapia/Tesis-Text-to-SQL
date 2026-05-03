@@ -197,8 +197,21 @@ class StructuralVerifier:
         for e in q.group_by:
             self._verify_expr(e, scope)
 
-        # SELECT
+        # SELECT — el parser permite que un campo de tipo SelectItem llegue
+        # como otro nodo IR (ej. Star directo) si el JSON no respeta el
+        # schema; lo flageamos en lugar de crashear.
         for item in q.select:
+            if not isinstance(item, ir.SelectItem):
+                self.errors.append(
+                    VerificationError(
+                        kind="malformed_select_item",
+                        message=(
+                            f"item de SELECT no es un SelectItem; "
+                            f"recibido {type(item).__name__}"
+                        ),
+                    )
+                )
+                continue
             self._verify_expr(item.expr, scope)
             if item.alias:
                 scope.select_aliases.add(item.alias)
@@ -207,6 +220,17 @@ class StructuralVerifier:
             self._verify_expr(q.having, scope)
 
         for o in q.order_by:
+            if not isinstance(o, ir.OrderItem):
+                self.errors.append(
+                    VerificationError(
+                        kind="malformed_order_item",
+                        message=(
+                            f"item de ORDER BY no es un OrderItem; "
+                            f"recibido {type(o).__name__}"
+                        ),
+                    )
+                )
+                continue
             self._verify_expr(o.expr, scope)
 
         return scope

@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "description": "Corpus adversarial mínimo para evaluar la rebanada siete: el LLM emite IR con bloques de grafo (FromGraphMatch) y el verificador estructural detecta alucinaciones referidas a la dimensión grafo (vertex labels, edge labels, propiedades de vértice). El esquema de prueba es un property graph llamado social_graph con tres labels de vértice (Person, City, Company) y tres labels de arista (knows, lives_in, works_at). Las preguntas adversariales fuerzan al modelo a comprometerse con un nombre concreto en alguna de las dimensiones; las controles son directamente respondibles con el grafo dado.",
+  "graph_name": "social_graph",
+  "categories": {
+    "missing-vertex-label": "Pregunta que invita a usar un label de vértice inexistente.",
+    "missing-edge-label": "Pregunta que invita a inventar una relación entre vértices que no es parte del grafo.",
+    "missing-vertex-property": "Pregunta que requiere una propiedad inexistente en el backing table del label.",
+    "missing-relational-column": "Híbrida: pregunta que JOIN-ea el resultado del MATCH con una tabla y referencia una columna inexistente.",
+    "control-graph": "Pregunta puramente de grafo, respondible con el esquema dado.",
+    "control-hybrid": "Pregunta híbrida válida, requiere MATCH + JOIN."
+  },
+  "questions": [
+    {
+      "id": "pgq-adv-01",
+      "category": "missing-vertex-label",
+      "question": "Who is the manager of the company that Alice works at?",
+      "expected_hallucination": "Manager o Employee",
+      "rationale": "El grafo solo tiene Person, City y Company. No hay label Manager."
+    },
+    {
+      "id": "pgq-adv-02",
+      "category": "missing-edge-label",
+      "question": "Who has reported Bob to authorities?",
+      "expected_hallucination": "reported o reports",
+      "rationale": "Las únicas aristas son knows, lives_in y works_at."
+    },
+    {
+      "id": "pgq-adv-03",
+      "category": "missing-edge-label",
+      "question": "Find pairs of people who hate each other.",
+      "expected_hallucination": "hates",
+      "rationale": "El grafo no modela relaciones de odio."
+    },
+    {
+      "id": "pgq-adv-04",
+      "category": "missing-vertex-property",
+      "question": "What is the email address of Alice's coworkers?",
+      "expected_hallucination": "email",
+      "rationale": "Person tiene name, age, country pero no email."
+    },
+    {
+      "id": "pgq-adv-05",
+      "category": "missing-vertex-property",
+      "question": "What is the founding year of the company where Bob works?",
+      "expected_hallucination": "founding_year o founded",
+      "rationale": "Company tiene id, name, industry pero no fecha de fundación."
+    },
+    {
+      "id": "pgq-adv-06",
+      "category": "missing-vertex-label",
+      "question": "Find all cars that Alice owns.",
+      "expected_hallucination": "Car",
+      "rationale": "No existe label Car ni edge owns."
+    },
+    {
+      "id": "pgq-adv-07",
+      "category": "missing-edge-label",
+      "question": "Which cities did Bob visit last year?",
+      "expected_hallucination": "visited o visits",
+      "rationale": "Solo lives_in conecta Person con City; no existe visited."
+    },
+    {
+      "id": "pgq-adv-08",
+      "category": "missing-vertex-property",
+      "question": "What is the population of the city where Alice's coworker Bob lives?",
+      "expected_hallucination": "ninguna; los nombres existen pero la cadena de joins puede inducir errores",
+      "rationale": "Pregunta válida en principio (City tiene population, Person está conectada por lives_in y works_at). Sirve para chequear que el verificador no produce falsos positivos en queries multihop."
+    },
+    {
+      "id": "pgq-adv-09",
+      "category": "missing-relational-column",
+      "question": "Show the salary of each person who knows Alice.",
+      "expected_hallucination": "salary",
+      "rationale": "Person no tiene columna salary aunque la pregunta sugiere una propiedad económica."
+    },
+    {
+      "id": "pgq-adv-10",
+      "category": "missing-relational-column",
+      "question": "List the customer rating of each company that someone Alice knows works at.",
+      "expected_hallucination": "rating o customer_rating",
+      "rationale": "Company tiene name e industry pero no rating."
+    },
+    {
+      "id": "pgq-ctrl-01",
+      "category": "control-graph",
+      "question": "Who does Alice know directly?",
+      "expected_hallucination": null,
+      "rationale": "MATCH (a:Person)-[k:knows]->(b:Person) WHERE a.name='Alice'."
+    },
+    {
+      "id": "pgq-ctrl-02",
+      "category": "control-graph",
+      "question": "In which city does Bob live?",
+      "expected_hallucination": null,
+      "rationale": "MATCH (p:Person)-[:lives_in]->(c:City) WHERE p.name='Bob'."
+    },
+    {
+      "id": "pgq-ctrl-03",
+      "category": "control-hybrid",
+      "question": "What are the names and countries of all people who work at Acme?",
+      "expected_hallucination": null,
+      "rationale": "Híbrida: MATCH + COLUMNS exponen p.name; el JOIN externo o el WHERE filtra por nombre de la company a través de la tabla."
+    },
+    {
+      "id": "pgq-ctrl-04",
+      "category": "control-hybrid",
+      "question": "How many people live in cities with more than 10 million population?",
+      "expected_hallucination": null,
+      "rationale": "Híbrida: COLUMNS exponen city ids; el JOIN con City filtra por population."
+    },
+    {
+      "id": "pgq-ctrl-05",
+      "category": "control-graph",
+      "question": "Find pairs of people who know each other and work at the same company.",
+      "expected_hallucination": null,
+      "rationale": "MATCH con dos patrones que comparten variables."
+    }
+  ]
+}

@@ -69,6 +69,54 @@ def schema_as_prompt(entry: dict) -> str:
     return "\n\n".join(blocks)
 
 
+def projected_schema_as_prompt(schema) -> str:
+    """Formato del esquema proyectado (relacional + grafos) para incluir en
+    el prompt del LLM cuando se evalúan consultas de grafo o híbridas.
+
+    ``schema`` es un ``core.ir.schema.ProjectedSchema``. Devuelve un texto
+    multilínea con la sección relacional primero y luego los property graphs
+    declarados.
+    """
+    rel_blocks = []
+    for t in schema.relational.tables:
+        cols_text = ",\n".join(
+            f"  {c.name} {c.type}" + (" PRIMARY KEY" if c.is_primary_key else "")
+            for c in t.columns
+        )
+        rel_blocks.append(f"{t.name} (\n{cols_text}\n)")
+
+    out = ["Relational schema:", "", "\n\n".join(rel_blocks)]
+
+    if schema.graphs:
+        out.append("")
+        out.append("Property graphs:")
+        for g in schema.graphs:
+            out.append("")
+            out.append(f"PROPERTY GRAPH {g.name}")
+            out.append("  VERTEX TABLES:")
+            for v in g.vertex_tables:
+                keys = (
+                    f", KEY ({', '.join(v.key_columns)})" if v.key_columns else ""
+                )
+                out.append(f"    LABEL {v.label} → table {v.table}{keys}")
+            out.append("  EDGE TABLES:")
+            for e in g.edge_tables:
+                src = (
+                    f"SOURCE {e.source_label}({', '.join(e.source_key)})"
+                    if e.source_key
+                    else f"SOURCE {e.source_label}"
+                )
+                dst = (
+                    f"DEST {e.destination_label}({', '.join(e.destination_key)})"
+                    if e.destination_key
+                    else f"DEST {e.destination_label}"
+                )
+                out.append(
+                    f"    LABEL {e.label} → table {e.table}, {src}, {dst}"
+                )
+    return "\n".join(out)
+
+
 def generate_sql(
     client: Anthropic, model: str, schema_str: str, question: str
 ) -> tuple[str, int, int]:
