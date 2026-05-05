@@ -334,8 +334,22 @@ class StructuralVerifier:
         scope: Scope,
     ) -> None:
         if v.label is None:
-            # Patrón sin label: variable se enlaza a "any vertex"; saltamos
-            # el chequeo de existencia y tipos
+            # DuckPGQ requiere un label en cada VertexPattern, incluso cuando
+            # la variable ya estaba bindeada en otro patrón. En PGQ estándar
+            # un vertex sin label significa "any vertex", pero DuckPGQ
+            # rechaza con "All patterns must bind to a label". Es análogo a
+            # la restricción que exige variable obligatoria en aristas y
+            # queda como una clase separada de chequeo: restricción
+            # operativa del motor objetivo.
+            self.errors.append(
+                VerificationError(
+                    kind="missing_vertex_label",
+                    message=(
+                        f"vertex pattern {v.var!r} sin label; "
+                        f"DuckPGQ exige label en cada VertexPattern"
+                    ),
+                )
+            )
             return
         if graph is None:
             return

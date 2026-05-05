@@ -730,6 +730,104 @@ def test_path_step_skips_when_label_missing() -> None:
     assert [e for e in errors if e.kind == "path_step_incoherent"] == []
 
 
+def test_missing_vertex_label_detected() -> None:
+    """DuckPGQ exige label en cada VertexPattern; el verificador lo flagea
+    como restricción operativa del motor."""
+    q = _make_match_with_path(
+        (
+            (
+                EdgePattern(var="e", label="lives_in", direction="->"),
+                VertexPattern(var="v1", label=None),
+            ),
+        )
+    )
+    errors = verify_ir(q, _social_schema_for_path_tests())
+    missing = [e for e in errors if e.kind == "missing_vertex_label"]
+    assert missing, f"esperaba missing_vertex_label en {[e.kind for e in errors]}"
+    assert "'v1'" in missing[0].message
+
+
+def test_missing_vertex_label_in_head() -> None:
+    """También se detecta cuando el head del path no tiene label."""
+    q = RelationalQuery(
+        select=(SelectItem(expr=Star()),),
+        from_=FromGraphMatch(
+            match=MatchPattern(
+                graph="g",
+                patterns=(
+                    PathPattern(
+                        head=VertexPattern(var="anon", label=None),
+                        steps=(),
+                    ),
+                ),
+                columns=(
+                    SelectItem(
+                        expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="anon")),
+                    ),
+                ),
+            ),
+            alias="g",
+        ),
+    )
+    errors = verify_ir(q, _social_schema_for_path_tests())
+    assert any(
+        e.kind == "missing_vertex_label" and "anon" in e.message for e in errors
+    )
+
+
+def test_missing_vertex_label_in_multipattern_reused_var() -> None:
+    """Reproduce el caso que apareció con Sonnet en exp 07b: un MatchPattern
+    con dos sub-patrones donde el segundo reutiliza variables ya bindeadas
+    sin re-declarar sus labels. Válido en PGQ estándar pero rechazado por
+    DuckPGQ; el verificador debe atraparlo antes."""
+    q = RelationalQuery(
+        select=(SelectItem(expr=Star()),),
+        from_=FromGraphMatch(
+            match=MatchPattern(
+                graph="g",
+                patterns=(
+                    # Primer sub-patrón con todos los labels declarados
+                    PathPattern(
+                        head=VertexPattern(var="p1", label="Person"),
+                        steps=(
+                            (
+                                EdgePattern(var="k", label="knows", direction="->"),
+                                VertexPattern(var="p2", label="Person"),
+                            ),
+                            (
+                                EdgePattern(var="w2", label="works_at", direction="->"),
+                                VertexPattern(var="c", label="Company"),
+                            ),
+                        ),
+                    ),
+                    # Segundo sub-patrón reutiliza p1 y c sin label
+                    PathPattern(
+                        head=VertexPattern(var="p1", label=None),
+                        steps=(
+                            (
+                                EdgePattern(var="w1", label="works_at", direction="->"),
+                                VertexPattern(var="c", label=None),
+                            ),
+                        ),
+                    ),
+                ),
+                columns=(
+                    SelectItem(
+                        expr=ColumnExpr(ref=ColumnRef(name="name", qualifier="p1")),
+                    ),
+                ),
+            ),
+            alias="g",
+        ),
+    )
+    errors = verify_ir(q, _social_schema_for_path_tests())
+    missing = [e for e in errors if e.kind == "missing_vertex_label"]
+    # El segundo sub-patrón aporta dos vertex sin label
+    assert len(missing) == 2
+    assert any("'p1'" in e.message for e in missing)
+    assert any("'c'" in e.message for e in missing)
+
+
 def test_vertex_label_without_table_detected() -> None:
     """El grafo declara un label cuya backing table no existe en el esquema
     relacional. El verificador debe detectar esa incoherencia cuando se usa el

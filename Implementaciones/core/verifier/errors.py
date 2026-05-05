@@ -34,6 +34,9 @@ class VerificationError:
     Clase de coherencia cruzada:
         - ``vertex_label_without_table``
         - ``path_step_incoherent``
+
+    Clase de restricciones operativas del motor (DuckPGQ):
+        - ``missing_vertex_label``
     """
 
     kind: str
