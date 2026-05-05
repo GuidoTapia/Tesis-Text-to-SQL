@@ -21,6 +21,8 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 06 | ¿el prompt caching del schema baja el costo? | 15 adv. + 5 control | 3 | sqlite3 | implementación correcta pero la cuenta/tier no activa el caching; cache_creation y cache_read en 0 | 0,11 |
 | 07 | ¿el cierre estructural funciona sobre IR de grafo? LLM construye queries PGQ vía tool use | 10 adv. + 5 control | grafo `social_graph` | DuckDB+DuckPGQ | 5/10 adversariales atrapadas por verifier; 5/5 controles limpios; 1 modo de fallo nuevo identificado (PathPattern multihop incoherente) | 0,09 |
 | 07b | ¿los modos de fallo del 07 son modelo-específicos? | 10 adv. + 5 control | grafo `social_graph` | DuckDB+DuckPGQ | con Sonnet 4.6: 2/10 adv atrapadas, 8/10 reformulan sin alucinar; 1 ctrl falla por restricción de DuckPGQ no contemplada por el verifier | 0,25 |
+| 08 | ¿el bucle de feedback rescata fallos del exp 07? | 10 adv. + 5 control | grafo `social_graph` | DuckDB+DuckPGQ | 8/10 adv y 5/5 ctrl tienen éxito (vs 4/10 y 5/5 en exp 07); 2 adv quedan irrecuperables tras 3 iter | 0,12 |
+| 09 | ¿el bucle de feedback rescata fallos relacionales? | 10 rescue + 10 control | sample exp 02 | DuckDB estricto | 2/10 rescue_candidates rescatados (los 8 restantes son data quality irrecuperable); 9/10 should_still_pass mantienen éxito | 0,18 |
 
 ## Configuración detallada
 
@@ -33,6 +35,8 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 05 | `evaluation/run_experiment_05.py` | `runs/experiment_05_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Mismo corpus que 04. LLM forzado a tool use con `input_schema = IR_TOOL_INPUT_SCHEMA` (~9 KB). Pipeline: tool_call → parse_ir → verify_ir → compile_query → execute_on_db |
 | 06 | `evaluation/run_experiment_06.py` | `runs/experiment_06_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | sqlite3 stdlib | Mismo flujo que 05 con `cache_control` en la definición del tool; el ahorro esperado no se materializó por limitación a nivel de cuenta/tier (ver lab notebook) |
 | 07 | `evaluation/run_experiment_07.py` | `runs/experiment_07_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | DuckDB+DuckPGQ in-memory | Corpus PGQ en `corpus/adversarial/pgq_decoys.json`; grafo `social_graph` con 3 vertex y 3 edge labels creado en el script; pipeline tool_call → parse_ir → verify_ir → compile_query → execute_on_graph_db |
+| 08 | `evaluation/run_experiment_08.py` | `runs/experiment_08_*.json` | claude-haiku-4-5-20251001 | n/a (corpus fijo) | DuckDB+DuckPGQ in-memory | Mismo corpus que 07 con `core.feedback.answer_with_feedback`; max_iterations=3 |
+| 09 | `evaluation/run_experiment_09.py` | `runs/experiment_09_*.json` | claude-haiku-4-5-20251001 | 42 | DuckDB estricto sobre Spider sqlite | Subset de 20 preguntas (10 rescue_candidates + 10 should_still_pass) seleccionado del JSON de exp 02; bucle con max_iterations=3 |
 
 ## Tiempo y consumo
 
@@ -46,7 +50,9 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 06 | 20 | 94 964 | 7 675 | 48,0 s | 0,11 |
 | 07 | 15 | 80 701 | 8 592 | 48,5 s | 0,09 |
 | 07b | 15 | 80 281 | 9 011 | 86,8 s | 0,25 |
-| Total | 210 | 393 551 | 38 398 | ~397 s | ~0,62 |
+| 08 | 15 | 119 124 | 12 803 | 89,7 s | 0,12 |
+| 09 | 20 | 175 949 | 21 408 | 137,8 s | 0,18 |
+| Total | 245 | 688 624 | 72 619 | ~625 s | ~0,92 |
 
 ## Detalle por experimento
 
