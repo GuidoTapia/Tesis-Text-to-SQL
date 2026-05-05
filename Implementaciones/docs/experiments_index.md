@@ -20,6 +20,7 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 05 | ¿el cierre estructural funciona? LLM emite IR vía tool use, ya no puede emitir SQL libre | 15 adv. + 5 control | 3 | sqlite3 | 3/3 alucinaciones atrapadas por verifier estructural antes de compilar; 0 prosa; 0 falsos positivos | 0,10 |
 | 06 | ¿el prompt caching del schema baja el costo? | 15 adv. + 5 control | 3 | sqlite3 | implementación correcta pero la cuenta/tier no activa el caching; cache_creation y cache_read en 0 | 0,11 |
 | 07 | ¿el cierre estructural funciona sobre IR de grafo? LLM construye queries PGQ vía tool use | 10 adv. + 5 control | grafo `social_graph` | DuckDB+DuckPGQ | 5/10 adversariales atrapadas por verifier; 5/5 controles limpios; 1 modo de fallo nuevo identificado (PathPattern multihop incoherente) | 0,09 |
+| 07b | ¿los modos de fallo del 07 son modelo-específicos? | 10 adv. + 5 control | grafo `social_graph` | DuckDB+DuckPGQ | con Sonnet 4.6: 2/10 adv atrapadas, 8/10 reformulan sin alucinar; 1 ctrl falla por restricción de DuckPGQ no contemplada por el verifier | 0,25 |
 
 ## Configuración detallada
 
@@ -44,7 +45,8 @@ Haiku 4.5 al momento de la corrida (USD 0,80/Mtok input, USD 4/Mtok output).
 | 05 | 20 | 94 964 | 7 231 | 44,5 s | 0,10 |
 | 06 | 20 | 94 964 | 7 675 | 48,0 s | 0,11 |
 | 07 | 15 | 80 701 | 8 592 | 48,5 s | 0,09 |
-| Total | 195 | 313 270 | 29 387 | ~310 s | ~0,37 |
+| 07b | 15 | 80 281 | 9 011 | 86,8 s | 0,25 |
+| Total | 210 | 393 551 | 38 398 | ~397 s | ~0,62 |
 
 ## Detalle por experimento
 
