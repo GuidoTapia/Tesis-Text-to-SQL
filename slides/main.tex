@@ -1,0 +1,438 @@
+% Plan de tesis -- Maestría/Pregrado en Ciencia de la Computación, UCSP
+% Compilación: latexmk -pdf main.tex (biber se invoca automáticamente)
+\documentclass[aspectratio=169]{beamer}
+
+% --- PAQUETES ---
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{csquotes}
+\usepackage[backend=biber, style=apa, natbib=true]{biblatex}
+\DeclareLanguageMapping{spanish}{spanish-apa}
+\addbibresource{ref.bib}
+
+% --- TEMA Y CONFIGURACIÓN ---
+\usetheme{Dresden}
+\setbeamertemplate{caption}[numbered]
+\setbeamertemplate{bibliography item}[text]
+
+% Bloques destacados algo más sobrios
+\setbeamercolor{block title alerted}{bg=red!15, fg=red!60!black}
+\setbeamercolor{block body alerted}{bg=red!5}
+
+% --- INFORMACIÓN DEL TÍTULO ---
+\title[Arquitectura RI para SQL/PGQ]{Arquitectura basada en representación intermedia para la generación confiable de consultas SQL/PGQ desde lenguaje natural}
+\subtitle{Plan de tesis -- Avance parcial}
+\author[G. Tapia Or\'e]{
+  Guido Luis Tapia Or\'e \\
+  \small Asesora: Dra. Regina Paola Ticona Herrera
+}
+\institute{Universidad Católica San Pablo \\ Escuela Profesional de Ciencia de la Computación}
+\date{2026}
+
+\begin{document}
+
+% ===================================================================
+% PORTADA
+% ===================================================================
+\begin{frame}[plain]
+    \titlepage
+\end{frame}
+
+% ===================================================================
+% TABLA DE CONTENIDOS
+% ===================================================================
+\begin{frame}{Contenido}
+    \tableofcontents
+\end{frame}
+
+% ===================================================================
+\section{Motivación y problema}
+% ===================================================================
+
+\begin{frame}{Motivación: interfaces en lenguaje natural sobre datos}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\textbf{Tendencia actual.} Las organizaciones \emph{data-driven} migran de interfaces gráficas a interfaces conversacionales sobre sus bases de datos \parencite{Data2Decisions, NLinterfaces}.
+
+\medskip
+
+\textbf{Tres pilares para producción:}
+\begin{itemize}
+    \item \textbf{Integridad técnica:} ejecutabilidad y fidelidad semántica al esquema \parencite{spider2_2025}.
+    \item \textbf{Seguridad y gobernanza:} control de acceso y auditoría.
+    \item \textbf{Robustez al esquema:} estabilidad ante catálogos masivos y \emph{schema drift}.
+\end{itemize}
+\end{column}
+\begin{column}{0.45\textwidth}
+\begin{block}{Brecha observada}
+El alto desempeño en \emph{benchmarks} clásicos decae drásticamente sobre bases corporativas reales \parencite{BIRD2023, spider2_2025}.
+\end{block}
+\medskip
+\textbf{Adicionalmente:} la estandarización ISO/IEC 9075-16:2023 \parencite{ISO9075_16_2023} integra \emph{property graphs} dentro de SQL (\textbf{SQL/PGQ}), expandiendo el espacio del problema.
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{El problema: alucinaciones en \emph{text-to-query} sobre SQL/PGQ}
+\textbf{Causa estructural.} Los LLM predicen tokens sin mecanismos intrínsecos que vinculen la salida con el esquema ni con la semántica del lenguaje objetivo. Esta desalineación produce \textbf{alucinaciones estructurales}:
+\begin{itemize}
+    \item Tablas o columnas inexistentes; rutas de \emph{join} inventadas.
+    \item Condiciones lógicas inconsistentes; agregaciones incongruentes.
+    \item Patrones de grafo mal formados; etiquetas de vértice o arista inventadas.
+\end{itemize}
+
+\medskip
+
+\textbf{Agravante en SQL/PGQ.} La consulta opera sobre \emph{dos estructuras superpuestas}:
+\begin{enumerate}
+    \item esquema relacional (tablas, columnas, claves, tipos);
+    \item grafo de propiedad (vértices, aristas, etiquetas, propiedades).
+\end{enumerate}
+La incoherencia cruzada relacional--grafo introduce \textbf{nuevas categorías de fallo} no presentes en \emph{text-to-SQL} clásico.
+
+\begin{alertblock}{Pregunta de investigación}
+¿Cómo mitigar de forma sistemática las alucinaciones estructurales y semánticas en la generación \emph{text-to-query} sobre esquemas híbridos SQL/PGQ, de modo que las consultas resultantes sean correctas, verificables y operables en contextos empresariales?
+\end{alertblock}
+\end{frame}
+
+% ===================================================================
+\section{Objetivos}
+% ===================================================================
+
+\begin{frame}{Objetivos}
+\textbf{Objetivo general.}
+Proponer una arquitectura de razonamiento estructural basada en representación intermedia (RI) para la generación \emph{text-to-query} orientada al estándar SQL/PGQ, que mitigue las alucinaciones de esquema y los errores semánticos en escenarios de consulta empresarial.
+
+\medskip
+
+\textbf{Objetivos específicos.}
+\begin{enumerate}
+    \item \textbf{Caracterizar} los tipos de alucinación en \emph{text-to-query} mediante una taxonomía aplicable a consultas relacionales e híbridas.
+    \item \textbf{Diseñar} una RI unificada (IR-SQL/PGQ) con reglas de tipado y compilación determinista.
+    \item \textbf{Implementar} un \emph{pipeline} con anclaje al esquema, generación restringida y bucle de verificación estática y dinámica.
+    \item \textbf{Evaluar} la propuesta frente al estado del arte mediante métricas de corrección, alucinación, robustez y eficiencia sobre \emph{benchmarks} establecidos.
+\end{enumerate}
+\end{frame}
+
+% ===================================================================
+\section{Estado del arte}
+% ===================================================================
+
+\begin{frame}{Estado del arte: panorama y brecha}
+\begin{table}
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|p{3.4cm}|p{4.0cm}|p{6.5cm}|}
+    \hline
+    \textbf{Familia} & \textbf{Aporte principal} & \textbf{Limitación frente a SQL/PGQ híbrido} \\
+    \hline
+    Decodificación restringida \parencite{PICARD2022} & Validez sintáctica por \emph{token} & Opera a nivel léxico; no captura coherencia cruzada relacional--grafo. \\
+    \hline
+    Descomposición y agentes \parencite{DINSQL2023, MACSQL2023} & Divide la generación en sub-tareas & Restringido al régimen relacional puro. \\
+    \hline
+    Alineación pre-generación \parencite{TASQL2024} & Reduce alucinaciones por anclaje al esquema & No contempla esquemas duales. \\
+    \hline
+    \emph{Schema linking} y M-Schema \parencite{XiYanSQL2024, RSLSQL2024} & Representación rica y enlazado bidireccional & Solo describe el bloque relacional. \\
+    \hline
+    Verificación por ejecución \parencite{CHESS2024} & Bucle correctivo basado en motor & Retroalimentación textual frágil; sin mediación tipada. \\
+    \hline
+    Razonamiento tabular--grafo \parencite{STRuCTLLM2025} & Unifica ambos paradigmas con RL & No produce SQL/PGQ estándar verificable. \\
+    \hline
+    \end{tabular}
+    }
+\end{table}
+
+\begin{alertblock}{Brecha identificada}
+Los mecanismos existen, pero \textbf{fragmentados} y centrados en SQL relacional. Falta una \emph{arquitectura integrada} que coordine anclaje, mediación tipada y verificación sobre el estándar híbrido SQL/PGQ.
+\end{alertblock}
+\end{frame}
+
+% ===================================================================
+\section{Propuesta}
+% ===================================================================
+
+\begin{frame}{Bases técnicas seleccionadas}
+\begin{figure}
+    \centering
+    \resizebox{0.92\textwidth}{!}{%
+        \input{graficos/bases-tecnicas.tex}
+    }
+\end{figure}
+\vspace{-0.4cm}
+\begin{itemize}\small
+    \item \textbf{Reutilización dirigida}: cada base cubre una dimensión del marco taxonómico y se integra por puntos de extensión.
+    \item \textbf{DuckDB + DuckPGQ} \parencite{DuckPGQ}: única implementación abierta del estándar SQL/PGQ \parencite{ISO9075_16_2023} con persistencia nativa de grafos de propiedad.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Requisitos y principios de diseño}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Requisitos (R1--R6)}
+\begin{itemize}\small
+    \item[\textbf{R1}] Anclaje al esquema dual.
+    \item[\textbf{R2}] Representación intermedia tipada.
+    \item[\textbf{R3}] Separación generación / compilación.
+    \item[\textbf{R4}] Verificación en dos regímenes.
+    \item[\textbf{R5}] Modularidad y agnosticismo del LLM.
+    \item[\textbf{R6}] Trazabilidad de decisiones.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Principios (P1--P5)}
+\begin{itemize}\small
+    \item[\textbf{P1}] \emph{Grounding} antes que generación.
+    \item[\textbf{P2}] Mediación obligatoria por RI.
+    \item[\textbf{P3}] Verificación en cascada (estática $\to$ dinámica).
+    \item[\textbf{P4}] Transparencia estructural y auditabilidad.
+    \item[\textbf{P5}] Desacoplamiento del modelo generador.
+\end{itemize}
+\end{column}
+\end{columns}
+
+\medskip
+
+\begin{block}{Idea central}
+Las alucinaciones se confinan al espacio de la \emph{RI tipada}, donde son \textbf{detectables y rechazables} antes de alcanzar el motor de ejecución.
+\end{block}
+\end{frame}
+
+\begin{frame}{Pipeline propuesto}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.92\textwidth, keepaspectratio]{graficos/pipeline-general.png}
+\end{figure}
+\vspace{-0.3cm}
+\begin{enumerate}\footnotesize
+    \item \textbf{Pre-procesamiento y anclaje al esquema dual.} Construye $\Sigma_{\mathrm{proj}} = \langle T_{\mathrm{rel}}, V_{\mathrm{grafo}}, E_{\mathrm{grafo}}, C_{\mathrm{val}} \rangle$.
+    \item \textbf{Interpretación estructurada} de la pregunta: entidades, restricciones, tipo de razonamiento.
+    \item \textbf{Construcción de la RI tipada} (IR-SQL/PGQ).
+    \item \textbf{Compilación determinista} a SQL/PGQ.
+    \item \textbf{Verificación} estática y dinámica, con bucle de refinamiento sobre la RI.
+\end{enumerate}
+\end{frame}
+
+% ===================================================================
+\section{Representación intermedia: IR-SQL/PGQ}
+% ===================================================================
+
+\begin{frame}{IR-SQL/PGQ -- Estructura general}
+\textbf{Una RI en tres bloques cerrados.}
+\begin{columns}[T]
+\begin{column}{0.33\textwidth}
+\textbf{Bloque relacional}
+\begin{itemize}\scriptsize
+    \item \texttt{TableRef}, \texttt{ColumnRef}.
+    \item Expresiones recursivas, agregaciones, sub-consultas.
+    \item \texttt{RelationalQuery}, \texttt{SetOperation}.
+\end{itemize}
+\scriptsize\emph{Cobertura empírica: 99\% \emph{round-trip} estructural sobre Spider \emph{dev}.}
+\end{column}
+\begin{column}{0.33\textwidth}
+\textbf{Bloque de grafo}
+\begin{itemize}\scriptsize
+    \item \texttt{VertexPattern}: variable + etiqueta.
+    \item \texttt{EdgePattern}: variable + etiqueta + dirección.
+    \item \texttt{PathPattern}: caminos \emph{multihop}.
+    \item \texttt{MatchPattern}: raíz, expone columnas.
+\end{itemize}
+\scriptsize\emph{Materializa la cláusula} \texttt{GRAPH\_TABLE(MATCH \ldots COLUMNS)} \emph{del estándar} \parencite{ISO9075_16_2023, DuckPGQ}.
+\end{column}
+\begin{column}{0.33\textwidth}
+\textbf{Composición híbrida}
+\begin{itemize}\scriptsize
+    \item \texttt{FromGraphMatch} ocupa cualquier posición de \texttt{FromExpr}.
+    \item Composicionalidad estructural: sin nodos especiales para el caso mixto.
+    \item Tres ámbitos separados: aliases relacionales, aliases de grafo, variables del MATCH.
+\end{itemize}
+\end{column}
+\end{columns}
+\medskip
+\begin{block}{Linaje del diseño}
+\textbf{SemQL} \parencite{IRNet}: descomposición tipada $\to$ \textbf{NatSQL}: uniformidad operacional $\to$ \textbf{RESDSQL} \parencite{RESDSQL2023}: compilador determinista. \textbf{Aporte propio:} bloques de grafo y composición híbrida.
+\end{block}
+\end{frame}
+
+\begin{frame}{IR-SQL/PGQ -- Contrato JSON e invariantes operativos}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\textbf{Contrato bidireccional con el LLM.}
+\begin{itemize}\small
+    \item Cada nodo es una \emph{dataclass} \texttt{frozen} $\to$ objeto JSON con campo \texttt{type}.
+    \item JSON Schema \emph{draft 2020-12} se inyecta como \texttt{input\_schema} de una \emph{tool} en la API del modelo.
+    \item Cuatro \textbf{guardas en serie}: \emph{schema} $\to$ \emph{parser} $\to$ verificador estático $\to$ verificación dinámica.
+    \item El modelo \textbf{no puede emitir SQL libre}: la única salida válida es una instancia de la RI.
+\end{itemize}
+\end{column}
+\begin{column}{0.45\textwidth}
+\textbf{Cuatro invariantes validados empíricamente.}
+\begin{enumerate}\footnotesize
+    \item \emph{Inmutabilidad e igualdad estructural} (dataclasses \texttt{frozen}).
+    \item \emph{Round-trip lift--compilación}: el compilador es inversa derecha del lifter.
+    \item \emph{Round-trip parse--serialización}: \texttt{parse\_ir(to\_dict(q)) == q}.
+    \item \emph{Soundness referencial}: toda referencia válida en la RI corresponde a $\Sigma_{\mathrm{proj}}$.
+\end{enumerate}
+\end{column}
+\end{columns}
+\medskip
+\begin{alertblock}{Diferencia frente a auto-corrección estándar}
+La corrección se aplica \emph{ex ante} sobre la RI, antes de que cualquier SQL textual exista, no \emph{ex post} sobre la salida del motor.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Verificación: estática y dinámica}
+\textbf{Verificación estática} sobre IR-SQL/PGQ (cuatro familias):
+\begin{itemize}\small
+    \item \textbf{Referencial}: \texttt{unknown\_table}, \texttt{unknown\_column}, \texttt{unknown\_vertex\_label}, \texttt{unknown\_edge\_label}.
+    \item \textbf{Consistencia de tipos}: \texttt{type\_mismatch\_aggregate}, \texttt{type\_mismatch\_arithmetic}.
+    \item \textbf{Coherencia cruzada relacional--grafo}: \texttt{vertex\_label\_without\_table}, \texttt{path\_step\_incoherent}.
+    \item \textbf{Restricciones operativas del motor} (DuckPGQ): \texttt{missing\_vertex\_label}.
+\end{itemize}
+
+\medskip
+
+\textbf{Verificación dinámica.} Si la consulta supera el chequeo estático, se ejecuta sobre DuckPGQ \parencite{DuckPGQ} como \emph{oráculo parcial}: válida, inválida por error, o ejecutable con salida atípica.
+
+\medskip
+
+\begin{block}{Política de retroalimentación estructurada}
+El bucle no reenvía al LLM el mensaje crudo del motor, sino un \textbf{descriptor categórico} que se inyecta en la etapa de construcción de la RI. Refuerza P4 (auditabilidad) y P2 (mediación tipada).
+\end{block}
+\end{frame}
+
+% ===================================================================
+\section{Plan experimental y avance}
+% ===================================================================
+
+\begin{frame}{Plan experimental}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Stack técnico fijado.}
+\begin{itemize}\footnotesize
+    \item \textbf{Motor:} DuckDB 1.4.4 + extensión \texttt{duckpgq}.
+    \item \textbf{LLM inicial:} Claude Haiku 4.5 (sustituible por P5).
+    \item \textbf{Parser SQL:} sqlglot, dialecto \texttt{duckdb}.
+    \item \textbf{Entorno:} \texttt{uv} 0.11+, Python 3.11.
+\end{itemize}
+
+\textbf{Datasets y benchmarks.}
+\begin{itemize}\footnotesize
+    \item \textbf{Spider} \parencite{Spider2018}, \textbf{BIRD} \parencite{BIRD2023}: régimen relacional.
+    \item \textbf{Spider 2.0} \parencite{spider2_2025}: régimen empresarial.
+    \item \textbf{Corpus PGQ propio}: régimen híbrido SQL/PGQ.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Métricas.}
+\begin{itemize}\footnotesize
+    \item \textbf{Canónicas} \parencite{SuperSQL2024}: \emph{Execution Accuracy} (EX), \emph{Exact Match} (EM), \emph{Valid Efficiency Score} (VES).
+    \item \textbf{Propias para SQL/PGQ}: tasa de alucinación referencial, coherencia cruzada, descriptores de error categóricos.
+\end{itemize}
+
+\textbf{Comparación.}
+\begin{itemize}\footnotesize
+    \item \emph{Baselines} arquitectónicos: CHESS \parencite{CHESS2024}, XiYan-SQL \parencite{XiYanSQL2024}.
+    \item \emph{Ablations}: con/sin RI, con/sin verificación dinámica, con/sin coherencia cruzada.
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Avance actual}
+\textbf{Componentes implementados.}
+\begin{itemize}\small
+    \item Definición de las \emph{dataclasses} de IR-SQL/PGQ y JSON Schema asociado.
+    \item Compilador determinista IR $\to$ SQL/PGQ con generación sistemática de variables de arista (restricción operativa de DuckPGQ).
+    \item Verificador estático con las cuatro familias de chequeo y descriptores canónicos.
+    \item \emph{Lifter} de SQL a RI: 99\% \emph{round-trip} estructural sobre 100 consultas predichas en Spider \emph{dev}.
+\end{itemize}
+
+\medskip
+
+\textbf{Experimentos preliminares.}
+\begin{itemize}\small
+    \item \textbf{Exp.\ 07}: comparativa Haiku 4.5 vs.\ Sonnet 4.6 sobre el \emph{baseline}.
+    \item \textbf{Exp.\ 08--09}: bucle de retroalimentación estructurada con clasificador de errores; corpus PGQ y Spider.
+\end{itemize}
+
+\begin{block}{Hallazgo cualitativo temprano}
+La mediación por RI tipada produce errores \emph{categorizables y reproducibles}, en contraste con la opacidad de los esquemas de auto-corrección sobre SQL textual.
+\end{block}
+\end{frame}
+
+\begin{frame}{Cronograma -- hitos principales}
+\small
+\begin{table}
+    \centering
+    \begin{tabular}{|c|p{6.0cm}|c|c|}
+    \hline
+    \textbf{Fase} & \textbf{Hito} & \textbf{Periodo} & \textbf{Avance} \\
+    \hline
+    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{Parcial 26-1}}}
+        & Plan de tesis: capítulos 1--4 + cronograma & Mar--May 2026 & 55\% \\
+        & Implementación arquitectura v1 (NL $\to$ RI $\to$ consulta) & May--Jun 2026 & 68\% \\
+        & Experimentación preliminar y exposición de avances & Jun 2026 & 80\% \\
+    \hline
+    \rotatebox[origin=c]{90}{\textbf{Inter.}}
+        & Refinamiento arquitectónico y revisión bibliográfica & Jul--Ago 2026 & 82\% \\
+    \hline
+    \multirow{2}{*}{\rotatebox[origin=c]{90}{\textbf{26-2}}}
+        & Ampliación experimental, ablations, análisis de errores & Ago--Oct 2026 & 91\% \\
+        & Redacción final, sustentación & Nov--Dic 2026 & 100\% \\
+    \hline
+    \end{tabular}
+\end{table}
+\centering
+\textbf{Estado actual}: cierre de Plan de Tesis y diapositivas de exposición parcial.
+\end{frame}
+
+% ===================================================================
+\section{Conclusiones}
+% ===================================================================
+
+\begin{frame}{Conclusiones provisionales y trabajo futuro}
+\textbf{Conclusiones provisionales.}
+\begin{itemize}\small
+    \item Existe una brecha clara: las técnicas de mitigación de alucinaciones están \emph{fragmentadas} y no cubren el régimen híbrido SQL/PGQ.
+    \item La \textbf{mediación por RI tipada} traslada al espacio de la representación los errores que actualmente se detectan tarde (o no se detectan) sobre SQL textual.
+    \item El prototipo demuestra factibilidad técnica: lifter, compilador determinista y verificador estático integrados sobre DuckPGQ.
+\end{itemize}
+
+\medskip
+
+\textbf{Trabajo futuro.}
+\begin{itemize}\small
+    \item Cierre del corpus PGQ propio para evaluación canónica del régimen híbrido.
+    \item Ampliación de la cobertura de la RI (\emph{window functions}, mecanismos de ambigüedad inspirados en \cite{AmbiSQL}).
+    \item \emph{Ablations} sistemáticos sobre el bucle de verificación.
+    \item Evaluación con LLMs adicionales (Sonnet 4.6, GPT, Gemini) bajo P5.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[plain]
+    \vfill
+    \centering
+    \Huge{\textbf{Gracias por su atención.}}
+    \vfill
+    \Large{Quedo a su disposición para preguntas y observaciones.}
+    \vfill
+    \small\textit{Guido Luis Tapia Or\'e \quad --\quad UCSP \quad --\quad 2026}
+    \vfill
+\end{frame}
+
+% ===================================================================
+% BIBLIOGRAFÍA
+% ===================================================================
+\begin{frame}[allowframebreaks, plain]{Referencias}
+    \printbibliography[heading=none]
+\end{frame}
+
+\end{document}
