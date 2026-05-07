@@ -13,8 +13,8 @@ Por ello, este capítulo adopta una taxonomía multidimensional para analizar la
 
 Resolver el problema \emph{text-to-query} obliga a considerar simultáneamente decisiones de: aprendizaje, orquestación arquitectónica, representación, enriquecimiento contextual y criterios de verificación. Estas decisiones operan en diferentes niveles y etapas, incluyendo combinaciones muy variadas en la literatura \cite{hong2024llmtext2sql,shi2025surveyllmtext2sql,liu2025nli4db}. 
 
-En base a esta complejidad y vacio identificado es que se desarrolló una taxonomía con seis dimensiones ortogonales para clasificar los sistemas \emph{text-to-query}. La taxonomía presentada fue elaborada recogiendo y reorganizando ejes ya presentes en surveys recientes \cite{hong2024llmtext2sql,liu2024nl2sqlsurvey,shi2025surveyllmtext2sql,qin2022recentadvances},
-y añadiendo dos contribuciones específicas, producto de la revisión de literatura y de los patrones observados: separar el \emph{paradigma de razonamiento} y las \emph{propiedades de evaluación} como dimensiones independientes, esto sin descuidar la ortogonalidad entre las dimensiones, de forma tal que un mismo trabajo pueda recibir etiquetas múltiples sin ambigüedad ni superposición entre estas.
+En base a esta complejidad y vacío identificado, se desarrolló una taxonomía con seis dimensiones complementarias para clasificar los sistemas \emph{text-to-query}. La taxonomía presentada fue elaborada recogiendo y reorganizando ejes ya presentes en surveys recientes \cite{hong2024llmtext2sql,liu2024nl2sqlsurvey,shi2025surveyllmtext2sql,qin2022recentadvances},
+y añadiendo dos contribuciones específicas, producto de la revisión de literatura y de los patrones observados: separar el \emph{paradigma de razonamiento} y las \emph{propiedades de evaluación} como dimensiones independientes, de forma tal que un mismo trabajo pueda recibir etiquetas en cada eje sin que las etiquetas de uno predetermine las del otro.
 
 \begin{figure}[h]
     \centering
@@ -103,9 +103,10 @@ DTS-SQL~\cite{DTS-SQL2024} ajustan modelos completos sobre conjuntos como
 Spider o WikiSQL. Las arquitecturas base varían desde redes específicas para
 \emph{text-to-SQL} (Seq2SQL, BRIDGE, RAT-SQL, SmBoP) hasta variantes de T5
 adaptadas (PICARD, RESDSQL, Graphix-T5). Los sistemas de esta sub-categoría
-históricamente han alcanzado las precisiones más altas en benchmarks
-controlados, aunque su costo de entrenamiento y su dependencia del dominio
-de entrenamiento limitan su transferencia directa a entornos empresariales.
+dominaron los rankings de los benchmarks controlados durante el período
+pre-LLM (2017--2022); su costo de entrenamiento y su dependencia del dominio
+de entrenamiento limitan, sin embargo, su transferencia directa a entornos
+empresariales.
 
 \paragraph{(b) Preentrenamiento continuo.} CodeS~\cite{CodeS2024} representa
 una variante intermedia: parte de un modelo de código preentrenado de
@@ -228,8 +229,8 @@ ejecución y la posible amplificación de errores entre etapas.
 
 Una variante reciente del enfoque modular dota a cada componente de
 autonomía e iniciativa, configurándolo como un agente que se comunica con
-otros mediante mensajes. MAC-SQL~\cite{MAC-SQL2023} fue uno de los
-primeros trabajos en formalizar esta organización para \emph{text-to-SQL},
+otros mediante mensajes. MAC-SQL~\cite{MAC-SQL2023} es uno de los
+trabajos influyentes en consolidar esta organización para \emph{text-to-SQL},
 con agentes especializados en \emph{schema linking}, descomposición y
 refinamiento. CHESS~\cite{CHESS2024} extiende esta línea con cuatro
 agentes ---recuperación de información, selección de esquema, generación
@@ -363,7 +364,7 @@ con su M-Schema. La consulta sigue siendo SQL nativo, pero la
 representación del esquema actúa como puente estructurado.
 
 \paragraph{(c) Lenguaje intermedio dedicado.} La línea más explícita
-hacia una RI propiamente dicha la inicia IRNet con SemQL~\cite{IRNet}, un
+hacia una RI propiamente dicha la inicia IRNet con SemQL~\cite{guo2019irnet}, un
 lenguaje intermedio que separa interpretación semántica de sintaxis SQL
 concreta. NatSQL~\cite{gan2021natsql} sigue una motivación análoga:
 define un lenguaje SQL simplificado sobre el que se entrena el modelo, y
@@ -430,7 +431,7 @@ construcción ciertos invariantes estructurales.
 \paragraph{(d) Compilación desde la representación intermedia.} Cuando
 el sistema utiliza una RI explícita, la decodificación final puede
 reducirse a la compilación determinista de la RI al lenguaje destino.
-IRNet~\cite{IRNet} y NatSQL~\cite{gan2021natsql}
+IRNet~\cite{guo2019irnet} y NatSQL~\cite{gan2021natsql}
 operan así: el modelo genera la RI y un componente determinista produce
 la consulta. Esta estrategia separa por completo el riesgo estadístico
 del riesgo formal.
@@ -718,7 +719,7 @@ linking}.
 
 La interpretabilidad se refiere a la posibilidad de inspeccionar y
 explicar el proceso que conduce a la consulta generada. Los trabajos
-que adoptan RI explícita ---IRNet~\cite{IRNet},
+que adoptan RI explícita ---IRNet~\cite{guo2019irnet},
 NatSQL~\cite{gan2021natsql}--- y los que producen
 trazas estructuradas ---DIN-SQL~\cite{DIN-SQL2023},
 CHESS~\cite{CHESS2024}, MAC-SQL~\cite{MAC-SQL2023}--- ofrecen mayor
@@ -764,7 +765,7 @@ observaciones de síntesis.
     representación intermedia.} La mayoría de los sistemas basados en
     \acp{LLM} prescinde de RI explícita y delega la corrección
     estructural al generador. Solo una minoría
-    ---IRNet~\cite{IRNet}, NatSQL~\cite{gan2021natsql},
+    ---IRNet~\cite{guo2019irnet}, NatSQL~\cite{gan2021natsql},
     SmBoP~\cite{SmBoP2021}, PICARD~\cite{PICARD2022},
     SQLFormer~\cite{SQLFormer2023}, SteinerSQL~\cite{SteinerSQL2025}---
     adopta variantes de RI o decodificación restringida. Esta
@@ -791,7 +792,13 @@ observaciones de síntesis.
     ISO/IEC 9075-16:2023~\cite{ISO9075_16_2023} y a la disponibilidad
     de motores que lo implementan~\cite{DuckPGQ}, ninguno de los
     sistemas analizados aborda la generación de consultas híbridas
-    bajo este estándar. STRuCT-LLM~\cite{STRuCT-LLM2025} y
+    bajo este estándar.\footnote{El alcance de la revisión cubre
+    publicaciones indexadas en arXiv, ACL Anthology, IEEE Xplore y
+    proceedings de ICLR, NeurIPS, EMNLP, ACL, VLDB y SIGMOD entre
+    2017 y 2026, con búsquedas combinando los términos
+    \emph{text-to-SQL}, \emph{text-to-query}, \emph{SQL/PGQ},
+    \emph{property graph}, \emph{hybrid graph relational query} y sus
+    variantes.} STRuCT-LLM~\cite{STRuCT-LLM2025} y
     text2gqlbench~\cite{text2gqlbench} se aproximan al razonamiento
     sobre grafos, pero no contemplan la dualidad relacional/grafo
     propia de \ac{SQL}/\ac{PGQ}. Otros trabajos como
