@@ -13,6 +13,7 @@
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, fit, backgrounds, calc}
 \usepackage{csquotes}
 \usepackage[backend=biber, style=apa, natbib=true]{biblatex}
 \DeclareLanguageMapping{spanish}{spanish-apa}
@@ -26,6 +27,22 @@
 % Bloques destacados algo más sobrios
 \setbeamercolor{block title alerted}{bg=red!15, fg=red!60!black}
 \setbeamercolor{block body alerted}{bg=red!5}
+
+% Paleta de TikZ
+\definecolor{tkBlue}{RGB}{52,103,181}
+\definecolor{tkGreen}{RGB}{56,142,60}
+\definecolor{tkOrange}{RGB}{230,140,40}
+\definecolor{tkRed}{RGB}{198,52,52}
+\definecolor{tkGrey}{RGB}{120,120,120}
+
+\tikzset{
+  tkbox/.style={draw=tkBlue, fill=tkBlue!8, rounded corners=2pt, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\footnotesize},
+  tkboxg/.style={draw=tkGreen, fill=tkGreen!10, rounded corners=2pt, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\footnotesize},
+  tkboxr/.style={draw=tkRed, fill=tkRed!10, rounded corners=2pt, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\footnotesize},
+  tkboxo/.style={draw=tkOrange, fill=tkOrange!12, rounded corners=2pt, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\footnotesize},
+  tkarrow/.style={-Latex, thick, tkGrey},
+  tklabel/.style={font=\scriptsize\itshape, tkGrey}
+}
 
 % --- INFORMACIÓN DEL TÍTULO ---
 \title[Arquitectura RI para SQL/PGQ]{Arquitectura basada en representación intermedia para la generación confiable de consultas SQL/PGQ desde lenguaje natural}
@@ -57,50 +74,68 @@
 \section{Motivación y problema}
 % ===================================================================
 
-\begin{frame}{Motivación: interfaces en lenguaje natural sobre datos}
-\begin{columns}[T]
-\begin{column}{0.55\textwidth}
-\textbf{Tendencia actual.} Las organizaciones \emph{data-driven} migran de interfaces gráficas a interfaces conversacionales sobre sus bases de datos \parencite{Data2Decisions, NLinterfaces}.
+\begin{frame}{Motivación: Cresciente interés del mercado con una respuesta poco estructurada}
+\centering
 
-\medskip
+\begin{tikzpicture}[node distance=0.6cm and 0.8cm]
+    \node[tkbox, minimum width=3.0cm] (nl) {Pregunta de\\negocio (NL)};
+    \node[tkbox, minimum width=3.0cm, right=of nl] (sys) {Sistema\\\emph{text-to-query}};
+    \node[tkboxg, minimum width=3.0cm, right=of sys] (db) {Resultado\\sobre la BD};
+    \draw[tkarrow] (nl) -- (sys);
+    \draw[tkarrow] (sys) -- (db);
+\end{tikzpicture}
 
-\textbf{Tres pilares para producción:}
-\begin{itemize}
-    \item \textbf{Integridad técnica:} ejecutabilidad y fidelidad semántica al esquema \parencite{spider2_2025}.
-    \item \textbf{Seguridad y gobernanza:} control de acceso y auditoría.
-    \item \textbf{Robustez al esquema:} estabilidad ante catálogos masivos y \emph{schema drift}.
-\end{itemize}
-\end{column}
-\begin{column}{0.45\textwidth}
-\begin{block}{Brecha observada}
-El alto desempeño en \emph{benchmarks} clásicos decae drásticamente sobre bases corporativas reales \parencite{BIRD2023, spider2_2025}.
-\end{block}
-\medskip
-\textbf{Adicionalmente:} la estandarización ISO/IEC 9075-16:2023 \parencite{ISO9075_16_2023} integra \emph{property graphs} dentro de SQL (\textbf{SQL/PGQ}), expandiendo el espacio del problema.
-\end{column}
-\end{columns}
+\vspace{1cm}
+\begin{tikzpicture}[node distance=0.6cm and 0.5cm]
+    \node[tkboxg, minimum width=4.0cm, minimum height=2.2cm] (dem) {\textbf{Demanda empresarial}\\\scriptsize Organizaciones\\\emph{data-driven}\\\scriptsize Self-service analytics\\\scriptsize Decisiones en ciclos cortos};
+    \node[tkbox, minimum width=4.0cm, minimum height=2.2cm, right=of dem] (llm) {\textbf{LLM como motor}\\\scriptsize Adopción acelerada\\\scriptsize Generalización a esquemas\\\scriptsize Lenguaje natural como\\interfaz primaria};
+    \node[tkboxr, minimum width=4.0cm, minimum height=2.2cm, right=of llm] (mkt) {\textbf{Oferta actual: ingenua}\\\scriptsize Esquema inyectado al \emph{prompt}\\\scriptsize Auto-corrección textual\\\scriptsize Sin verificación estructural};
+    
+\end{tikzpicture}
+
 \end{frame}
 
-\begin{frame}{El problema: alucinaciones en \emph{text-to-query} sobre SQL/PGQ}
-\textbf{Causa estructural.} Los LLM predicen tokens sin mecanismos intrínsecos que vinculen la salida con el esquema ni con la semántica del lenguaje objetivo. Esta desalineación produce \textbf{alucinaciones estructurales}:
-\begin{itemize}
-    \item Tablas o columnas inexistentes; rutas de \emph{join} inventadas.
-    \item Condiciones lógicas inconsistentes; agregaciones incongruentes.
-    \item Patrones de grafo mal formados; etiquetas de vértice o arista inventadas.
-\end{itemize}
 
-\medskip
 
-\textbf{Agravante en SQL/PGQ.} La consulta opera sobre \emph{dos estructuras superpuestas}:
-\begin{enumerate}
-    \item esquema relacional (tablas, columnas, claves, tipos);
-    \item grafo de propiedad (vértices, aristas, etiquetas, propiedades).
-\end{enumerate}
-La incoherencia cruzada relacional--grafo introduce \textbf{nuevas categorías de fallo} no presentes en \emph{text-to-SQL} clásico.
+\begin{frame}{Motivación: el esquema híbrido SQL/PGQ como oportunidad}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 0.3cm]
+    \node[tkbox, minimum width=3.0cm, minimum height=2.4cm] (rel) {\textbf{Relacional}\\\textbf{dominante}\\\scriptsize Madurez, integridad,\\estabilidad de\\producción};
+    \node[tkboxg, minimum width=3.0cm, minimum height=2.4cm, right=of rel] (graph) {\textbf{Grafos en alza}\\\scriptsize Modelado natural\\de rutas y vecindarios:\\fraude, ciberseguridad,\\\emph{supply chain}};
+    \node[tkboxo, minimum width=3.0cm, minimum height=2.4cm, right=of graph] (iso) {\textbf{Estandarización}\\\scriptsize ISO/IEC 9075-16:2023\\(SQL/PGQ)\\\scriptsize Grafos consultados\\desde SQL};
+    \node[tkboxr, minimum width=3.0cm, minimum height=2.4cm, right=of iso] (gap) {\textbf{Vacío en}\\\textbf{\emph{text-to-query}}\\\scriptsize SOTA cubre solo\\el lado relacional;\\el régimen híbrido\\queda sin abordar};
+\end{tikzpicture}
 
-\begin{alertblock}{Pregunta de investigación}
-¿Cómo mitigar de forma sistemática las alucinaciones estructurales y semánticas en la generación \emph{text-to-query} sobre esquemas híbridos SQL/PGQ, de modo que las consultas resultantes sean correctas, verificables y operables en contextos empresariales?
+\vspace{0.5cm}
+\begin{alertblock}{Oportunidad de investigación}
+\small El estándar híbrido \emph{ya existe} y \emph{ya tiene motores que lo implementan} ---DuckPGQ~\parencite{DuckPGQ} sobre ISO/IEC 9075-16:2023~\parencite{ISO9075_16_2023}. Lo que falta es una arquitectura \emph{text-to-query} que opere de forma confiable sobre este régimen.
 \end{alertblock}
+\end{frame}
+
+\begin{frame}{El problema: Carencia de técnicas text-to-query sobre un esquema dual SQL/PGQ}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\centering
+\begin{tikzpicture}[node distance=0.4cm]
+    \node[tkbox, minimum width=5cm] (rel) {\textbf{Esquema relacional}\\\scriptsize tablas, columnas, claves, tipos};
+    \node[tkboxg, minimum width=5cm, below=of rel] (graph) {\textbf{Grafo de propiedad}\\\scriptsize vértices, aristas, etiquetas, propiedades};
+    \node[draw=tkRed, dashed, fit=(rel)(graph), inner sep=0.25cm, label={[font=\scriptsize\bfseries, tkRed]above:Esquema dual SQL/PGQ}] {};
+\end{tikzpicture}
+
+\vspace{0.3cm}
+\scriptsize Estandarizado en ISO/IEC 9075-16:2023~\parencite{ISO9075_16_2023}, soportado por DuckPGQ~\parencite{DuckPGQ}.
+\end{column}
+\begin{column}{0.45\textwidth}
+\textbf{Modos de fallo del LLM:}
+\begin{itemize}\footnotesize
+    \item Tablas o columnas inexistentes.
+    \item Rutas de \emph{join} inventadas.
+    \item Etiquetas de vértice o arista inventadas.
+    \item Patrones de grafo mal formados.
+    \item \textcolor{tkRed}{\textbf{Incoherencia cruzada}} relacional--grafo (categoría nueva).
+\end{itemize}
+\end{column}
+\end{columns}
 \end{frame}
 
 % ===================================================================
@@ -108,314 +143,375 @@ La incoherencia cruzada relacional--grafo introduce \textbf{nuevas categorías d
 % ===================================================================
 
 \begin{frame}{Objetivos}
-\textbf{Objetivo general.}
-Proponer una arquitectura de razonamiento estructural basada en representación intermedia (RI) para la generación \emph{text-to-query} orientada al estándar SQL/PGQ, que mitigue las alucinaciones de esquema y los errores semánticos en escenarios de consulta empresarial.
+\textbf{Objetivo general.} Proponer una arquitectura de razonamiento estructural basada en representación intermedia (RI) para la generación \emph{text-to-query} sobre SQL/PGQ.
 
-\medskip
-
+\vspace{0.3cm}
 \textbf{Objetivos específicos.}
-\begin{enumerate}
-    \item \textbf{Caracterizar} los tipos de alucinación en \emph{text-to-query} mediante una taxonomía aplicable a consultas relacionales e híbridas.
-    \item \textbf{Diseñar} una RI unificada (IR-SQL/PGQ) con reglas de tipado y compilación determinista.
-    \item \textbf{Implementar} un \emph{pipeline} con anclaje al esquema, generación restringida y bucle de verificación estática y dinámica.
-    \item \textbf{Evaluar} la propuesta frente al estado del arte mediante métricas de corrección, alucinación, robustez y eficiencia sobre \emph{benchmarks} establecidos.
-\end{enumerate}
+
+\begin{tikzpicture}[node distance=0.25cm]
+    \node[tkbox, minimum width=6.5cm, minimum height=1.0cm] (o1) {\textbf{O1.} Diseñar IR-SQL/PGQ con tipado y\\compilación determinista};
+    \node[tkboxo, minimum width=6.5cm, minimum height=1.0cm, right=of o1] (o2) {\textbf{O2.} Implementar pipeline con anclaje, generación\\estructurada y verificación estática+dinámica};
+    \node[tkboxg, minimum width=6.5cm, minimum height=1.0cm, below=of o1] (o3) {\textbf{O3.} Evaluar con m\'etricas can\'onicas\\(EX, EM, VES)};
+    \node[tkboxr, minimum width=6.5cm, minimum height=1.0cm, below=of o2] (o4) {\textbf{O4.} Caracterizar transferibilidad y coste\\agregado por consulta (R7, R8)};
+\end{tikzpicture}
 \end{frame}
+
+
+
+
+
+
+
+
 
 % ===================================================================
 \section{Estado del arte}
 % ===================================================================
 
-\begin{frame}{Estado del arte: panorama y brecha}
+
+
+
+\begin{frame}{Estado del arte y brecha}
+\small
 \begin{table}
-    \centering
-    \resizebox{\textwidth}{!}{%
-    \begin{tabular}{|p{3.4cm}|p{4.0cm}|p{6.5cm}|}
-    \hline
-    \textbf{Familia} & \textbf{Aporte principal} & \textbf{Limitación frente a SQL/PGQ híbrido} \\
-    \hline
-    Decodificación restringida \parencite{PICARD2022} & Validez sintáctica por \emph{token} & Opera a nivel léxico; no captura coherencia cruzada relacional--grafo. \\
-    \hline
-    Descomposición y agentes \parencite{DINSQL2023, MACSQL2023} & Divide la generación en sub-tareas & Restringido al régimen relacional puro. \\
-    \hline
-    Alineación pre-generación \parencite{TASQL2024} & Reduce alucinaciones por anclaje al esquema & No contempla esquemas duales. \\
-    \hline
-    \emph{Schema linking} y M-Schema \parencite{XiYanSQL2024, RSLSQL2024} & Representación rica y enlazado bidireccional & Solo describe el bloque relacional. \\
-    \hline
-    Verificación por ejecución \parencite{CHESS2024} & Bucle correctivo basado en motor & Retroalimentación textual frágil; sin mediación tipada. \\
-    \hline
-    Razonamiento tabular--grafo \parencite{STRuCTLLM2025} & Unifica ambos paradigmas con RL & No produce SQL/PGQ estándar verificable. \\
-    \hline
-    \end{tabular}
-    }
+\centering
+\renewcommand{\arraystretch}{1.15}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lp{4.0cm}p{6.0cm}@{}}
+\toprule
+\textbf{Línea} & \textbf{Aporte principal} & \textbf{Limitación frente a SQL/PGQ} \\
+\midrule
+Decodificación restringida \scriptsize\parencite{PICARD2022} & Validez sintáctica por \emph{token} & Nivel léxico; no captura coherencia cruzada \\
+Descomposición / agentes \scriptsize\parencite{DINSQL2023, MACSQL2023} & Genera por sub-tareas & Solo régimen relacional puro \\
+Anclaje pre-generación \scriptsize\parencite{TASQL2024} & Reduce alucinaciones por \emph{grounding} & No contempla esquemas duales \\
+\emph{Schema linking} y M-Schema \scriptsize\parencite{XiYanSQL2024, RSLSQL2024} & Representación rica del esquema & Solo bloque relacional \\
+Verificación por ejecución \scriptsize\parencite{CHESS2024} & Bucle correctivo desde el motor & Retroalimentación textual frágil \\
+Razonamiento tabular--grafo \scriptsize\parencite{STRuCTLLM2025} & Unifica paradigmas con RL & No produce SQL/PGQ estándar \\
+\bottomrule
+\end{tabular}%
+}
 \end{table}
 
+\vspace{0.1cm}
 \begin{alertblock}{Brecha identificada}
-Los mecanismos existen, pero \textbf{fragmentados} y centrados en SQL relacional. Falta una \emph{arquitectura integrada} que coordine anclaje, mediación tipada y verificación sobre el estándar híbrido SQL/PGQ.
+Mecanismos maduros \emph{pero} fragmentados y centrados en SQL relacional. \\
+Falta una arquitectura que coordine \textbf{anclaje + RI tipada + verificación} sobre el estándar híbrido SQL/PGQ.
 \end{alertblock}
 \end{frame}
+
+\begin{frame}{Desempeño actual: el SOTA decae al salir del laboratorio}
+\centering
+\small
+\begin{table}
+\renewcommand{\arraystretch}{1.25}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Sistema} & \textbf{Spider} & \textbf{BIRD} & \textbf{Spider 2.0} & \textbf{Text2GQL} \\
+& \scriptsize\itshape EX (lab clásico) & \scriptsize\itshape EX (intermedio) & \scriptsize\itshape EX (empresarial) & \scriptsize\itshape EX (ISO-GQL) \\
+\midrule
+LLMs \emph{zero-shot} \parencite{text2gqlbench}                    & $\sim72$ & $\sim35$ & \textcolor{tkRed}{$\sim12$}                  & \textcolor{tkRed}{$\le 4$}~\scriptsize \\
+\midrule
+DIN-SQL~\scriptsize\parencite{DINSQL2023}        & 85 & 50 & \textcolor{tkRed}{6}  & --- \\
+MAC-SQL~\scriptsize\parencite{MACSQL2023}        & 86 & 60 & \textcolor{tkRed}{?}  & --- \\
+CHESS~\scriptsize\parencite{CHESS2024}           & 87 & 68 & \textcolor{tkRed}{17} & --- \\
+XiYan-SQL~\scriptsize\parencite{XiYanSQL2024}    & 89 & 73 & \textcolor{tkRed}{12}  & --- \\
+Qwen3-8B \emph{fine-tuned} (8B abierto)          & ---  & --- & ---                     & 45     \\  
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+\scriptsize\emph{Valores aproximados de Execution Accuracy (EX, en porcentaje) reportados por los autores en sus publicaciones de referencia.}
+
+% \vspace{0.3cm}
+% \begin{alertblock}{Lo que muestra la tabla}
+% \small Los sistemas más prometedores caen más de 60 puntos al pasar de Spider clásico al régimen empresarial de Spider 2.0~\parencite{spider2_2025}. Sobre grafo puro (ISO-GQL), los LLMs grandes \emph{zero-shot} no superan los 4 puntos de \emph{execution accuracy}~\parencite{text2gqlbench}. El régimen híbrido SQL/PGQ no tiene datos publicados: \textbf{el vacío que esta tesis aborda no es solo conceptual, también es empírico}.
+% \end{alertblock}
+\end{frame}
+
+
+
+
+
+
+
+
+
+
 
 % ===================================================================
 \section{Propuesta}
 % ===================================================================
 
-\begin{frame}{Bases técnicas seleccionadas}
-\begin{figure}
-    \centering
-    \resizebox{0.92\textwidth}{!}{%
-        \input{graficos/bases-tecnicas.tex}
-    }
-\end{figure}
-\vspace{-0.4cm}
-\begin{itemize}\small
-    \item \textbf{Reutilización dirigida}: cada base cubre una dimensión del marco taxonómico y se integra por puntos de extensión.
-    \item \textbf{DuckDB + DuckPGQ} \parencite{DuckPGQ}: única implementación abierta del estándar SQL/PGQ \parencite{ISO9075_16_2023} con persistencia nativa de grafos de propiedad.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Requisitos y principios de diseño}
-\begin{columns}[T]
-\begin{column}{0.5\textwidth}
-\textbf{Requisitos (R1--R6)}
-\begin{itemize}\small
-    \item[\textbf{R1}] Anclaje al esquema dual.
-    \item[\textbf{R2}] Representación intermedia tipada.
-    \item[\textbf{R3}] Separación generación / compilación.
-    \item[\textbf{R4}] Verificación en dos regímenes.
-    \item[\textbf{R5}] Modularidad y agnosticismo del LLM.
-    \item[\textbf{R6}] Trazabilidad de decisiones.
-\end{itemize}
-\end{column}
-\begin{column}{0.5\textwidth}
-\textbf{Principios (P1--P5)}
-\begin{itemize}\small
-    \item[\textbf{P1}] \emph{Grounding} antes que generación.
-    \item[\textbf{P2}] Mediación obligatoria por RI.
-    \item[\textbf{P3}] Verificación en cascada (estática $\to$ dinámica).
-    \item[\textbf{P4}] Transparencia estructural y auditabilidad.
-    \item[\textbf{P5}] Desacoplamiento del modelo generador.
-\end{itemize}
-\end{column}
-\end{columns}
-
-\medskip
-
-\begin{block}{Idea central}
-Las alucinaciones se confinan al espacio de la \emph{RI tipada}, donde son \textbf{detectables y rechazables} antes de alcanzar el motor de ejecución.
-\end{block}
-\end{frame}
-
 \begin{frame}{Pipeline propuesto}
 \begin{figure}
     \centering
-    \includegraphics[width=0.92\textwidth, keepaspectratio]{graficos/pipeline-general.png}
+    \includegraphics[width=0.96\textwidth, keepaspectratio]{graficos/pipeline-general.png}
 \end{figure}
-\vspace{-0.3cm}
-\begin{enumerate}\footnotesize
-    \item \textbf{Pre-procesamiento y anclaje al esquema dual.} Construye $\Sigma_{\mathrm{proj}} = \langle T_{\mathrm{rel}}, V_{\mathrm{grafo}}, E_{\mathrm{grafo}}, C_{\mathrm{val}} \rangle$.
-    \item \textbf{Interpretación estructurada} de la pregunta: entidades, restricciones, tipo de razonamiento.
-    \item \textbf{Construcción de la RI tipada} (IR-SQL/PGQ).
-    \item \textbf{Compilación determinista} a SQL/PGQ.
-    \item \textbf{Verificación} estática y dinámica, con bucle de refinamiento sobre la RI.
-\end{enumerate}
+\vspace{-0.2cm}
+\begin{itemize}\footnotesize
+    \item \textbf{(1) Anclaje al esquema dual.} Construye $\Sigma_{\mathrm{proj}} = \langle T_{\mathrm{rel}}, V_{\mathrm{grafo}}, E_{\mathrm{grafo}}, C_{\mathrm{val}} \rangle$.
+    \item \textbf{(2) Interpretación estructurada} de la pregunta.
+    \item \textbf{(3) Construcción de la RI tipada} IR-SQL/PGQ.
+    \item \textbf{(4) Compilación determinista} a SQL/PGQ.
+    \item \textbf{(5) Verificación} estática y dinámica con bucle de refinamiento sobre la RI.
+\end{itemize}
 \end{frame}
 
-% ===================================================================
-\section{Representación intermedia: IR-SQL/PGQ}
-% ===================================================================
+\begin{frame}{Anclaje al esquema dual: el esquema proyectado $\Sigma_{\mathrm{proj}}$}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 0.5cm]
+    % Entrada
+    \node[tkbox, minimum width=2.6cm, minimum height=0.6cm] (q) {\scriptsize \textbf{Pregunta NL}\\\scriptsize\itshape + esquema dual completo};
 
-\begin{frame}{IR-SQL/PGQ -- Estructura general}
-\textbf{Una RI en tres bloques cerrados.}
-\begin{columns}[T]
-\begin{column}{0.33\textwidth}
-\textbf{Bloque relacional}
-\begin{itemize}\scriptsize
-    \item \texttt{TableRef}, \texttt{ColumnRef}.
-    \item Expresiones recursivas, agregaciones, sub-consultas.
-    \item \texttt{RelationalQuery}, \texttt{SetOperation}.
-\end{itemize}
-\scriptsize\emph{Cobertura empírica: 99\% \emph{round-trip} estructural sobre Spider \emph{dev}.}
-\end{column}
-\begin{column}{0.33\textwidth}
-\textbf{Bloque de grafo}
-\begin{itemize}\scriptsize
-    \item \texttt{VertexPattern}: variable + etiqueta.
-    \item \texttt{EdgePattern}: variable + etiqueta + dirección.
-    \item \texttt{PathPattern}: caminos \emph{multihop}.
-    \item \texttt{MatchPattern}: raíz, expone columnas.
-\end{itemize}
-\scriptsize\emph{Materializa la cláusula} \texttt{GRAPH\_TABLE(MATCH \ldots COLUMNS)} \emph{del estándar} \parencite{ISO9075_16_2023, DuckPGQ}.
-\end{column}
-\begin{column}{0.33\textwidth}
-\textbf{Composición híbrida}
-\begin{itemize}\scriptsize
-    \item \texttt{FromGraphMatch} ocupa cualquier posición de \texttt{FromExpr}.
-    \item Composicionalidad estructural: sin nodos especiales para el caso mixto.
-    \item Tres ámbitos separados: aliases relacionales, aliases de grafo, variables del MATCH.
-\end{itemize}
-\end{column}
-\end{columns}
-\medskip
-\begin{block}{Linaje del diseño}
-\textbf{SemQL} \parencite{IRNet}: descomposición tipada $\to$ \textbf{NatSQL}: uniformidad operacional $\to$ \textbf{RESDSQL} \parencite{RESDSQL2023}: compilador determinista. \textbf{Aporte propio:} bloques de grafo y composición híbrida.
+    % Tres mecanismos
+    \node[tkboxg, minimum width=3.6cm, minimum height=0.6cm, right=0.8cm of q, yshift=0.9cm] (m1) {\scriptsize \textbf{(1) M-Schema dual}};
+    \node[tkbox, minimum width=3.6cm, minimum height=0.6cm, right=0.8cm of q] (m2) {\scriptsize \textbf{(2) Enlazado bidireccional}};
+    \node[tkbox, minimum width=3.6cm, minimum height=0.6cm, right=0.8cm of q, yshift=-0.9cm] (m3) {\scriptsize \textbf{(3) Recuperación de valores}};
+
+    % Salida
+    \node[tkboxr, minimum width=3.6cm, minimum height=1.8cm, right=0.8cm of m2] (sigma) {\scriptsize $\boldsymbol{\Sigma_{\mathrm{proj}}}$\\[2pt]\scriptsize $\langle T_{\mathrm{rel}},\,V_{\mathrm{grafo}},$\\\scriptsize $E_{\mathrm{grafo}},\,C_{\mathrm{val}}\rangle$\\[2pt]\scriptsize\itshape único contexto que\\\scriptsize\itshape consume el LLM};
+
+    % Flechas
+    \draw[tkarrow] (q) -- (m1);
+    \draw[tkarrow] (q) -- (m2);
+    \draw[tkarrow] (q) -- (m3);
+    \draw[tkarrow] (m1) -- (sigma);
+    \draw[tkarrow] (m2) -- (sigma);
+    \draw[tkarrow] (m3) -- (sigma);
+\end{tikzpicture}
+
+\vspace{0.3cm}
+\begin{block}{Procedencia y estado}
+\small \textbf{M-Schema} de XiYan-SQL~\parencite{XiYanSQL2024} extendido con descriptores de grafo, \textbf{enlazado bidireccional} de RSL-SQL~\parencite{RSLSQL2024} y \textbf{recuperación} estilo CHESS~\parencite{CHESS2024}. Hoy opera (1) sobre la estructura completa; (2) y (3) se incorporarán para esquemas masivos como BIRD donde el filtrado por relevancia es indispensable.
 \end{block}
 \end{frame}
 
-\begin{frame}{IR-SQL/PGQ -- Contrato JSON e invariantes operativos}
-\begin{columns}[T]
-\begin{column}{0.55\textwidth}
-\textbf{Contrato bidireccional con el LLM.}
-\begin{itemize}\small
-    \item Cada nodo es una \emph{dataclass} \texttt{frozen} $\to$ objeto JSON con campo \texttt{type}.
-    \item JSON Schema \emph{draft 2020-12} se inyecta como \texttt{input\_schema} de una \emph{tool} en la API del modelo.
-    \item Cuatro \textbf{guardas en serie}: \emph{schema} $\to$ \emph{parser} $\to$ verificador estático $\to$ verificación dinámica.
-    \item El modelo \textbf{no puede emitir SQL libre}: la única salida válida es una instancia de la RI.
-\end{itemize}
-\end{column}
-\begin{column}{0.45\textwidth}
-\textbf{Cuatro invariantes validados empíricamente.}
-\begin{enumerate}\footnotesize
-    \item \emph{Inmutabilidad e igualdad estructural} (dataclasses \texttt{frozen}).
-    \item \emph{Round-trip lift--compilación}: el compilador es inversa derecha del lifter.
-    \item \emph{Round-trip parse--serialización}: \texttt{parse\_ir(to\_dict(q)) == q}.
-    \item \emph{Soundness referencial}: toda referencia válida en la RI corresponde a $\Sigma_{\mathrm{proj}}$.
-\end{enumerate}
-\end{column}
-\end{columns}
-\medskip
-\begin{alertblock}{Diferencia frente a auto-corrección estándar}
-La corrección se aplica \emph{ex ante} sobre la RI, antes de que cualquier SQL textual exista, no \emph{ex post} sobre la salida del motor.
-\end{alertblock}
+\begin{frame}{IR-SQL/PGQ: vista intuitiva}
+\textbf{Ejemplo.} \emph{¿Qué empleados conocen a alguien del equipo de Marketing y trabajan en Lima?}
+
+
+\centering
+\begin{tikzpicture}[node distance=0.6cm]
+    \node[tkbox, minimum width=3.4cm, minimum height=2.0cm] (nl) {\scriptsize \textbf{NL}\\\scriptsize\itshape Empleados que\\conocen a alguien\\de Marketing y\\trabajan en Lima};
+    \node[tkboxo, minimum width=4.0cm, minimum height=2.0cm, right=of nl] (ir) {\scriptsize \textbf{IR-SQL/PGQ}\\\scriptsize\texttt{RelationalQuery}\\\scriptsize\texttt{ \textbar-- FromGraphMatch}\\\scriptsize\texttt{ \ \ \ MatchPattern}\\\scriptsize\texttt{ \ \ \ \ \ Person--$>$Person}\\\scriptsize\texttt{ \textbar-- Filter: city=Lima}};
+    \node[tkboxg, minimum width=3.6cm, minimum height=2.0cm, right=of ir] (sql) {\scriptsize \textbf{SQL/PGQ}\\\scriptsize\texttt{SELECT e.name}\\\scriptsize\texttt{FROM GRAPH\_TABLE(}\\\scriptsize\texttt{ MATCH (a:Person)}\\\scriptsize\texttt{ -[k:knows]-$>$}\\\scriptsize\texttt{ (b:Person) ...)}};
+    \draw[tkarrow] (nl) -- node[above, tklabel] {LLM} (ir);
+    \draw[tkarrow] (ir) -- node[above, tklabel] {compilador} (sql);
+\end{tikzpicture}
+\vspace{0.2cm}
+\begin{block}{Idea central}
+La RI es el \textbf{contrato fijo} entre el modelo y el resto del pipeline. El LLM \emph{nunca} emite un query libre: emite IR validada por tipos, que un compilador determinista traduce a SQL/PGQ.
+\end{block}
 \end{frame}
 
-\begin{frame}{Verificación: estática y dinámica}
-\textbf{Verificación estática} sobre IR-SQL/PGQ (cuatro familias):
-\begin{itemize}\small
-    \item \textbf{Referencial}: \texttt{unknown\_table}, \texttt{unknown\_column}, \texttt{unknown\_vertex\_label}, \texttt{unknown\_edge\_label}.
-    \item \textbf{Consistencia de tipos}: \texttt{type\_mismatch\_aggregate}, \texttt{type\_mismatch\_arithmetic}.
-    \item \textbf{Coherencia cruzada relacional--grafo}: \texttt{vertex\_label\_without\_table}, \texttt{path\_step\_incoherent}.
-    \item \textbf{Restricciones operativas del motor} (DuckPGQ): \texttt{missing\_vertex\_label}.
+\begin{frame}{IR-SQL/PGQ: árbol y tres bloques cerrados}
+\centering
+\begin{tikzpicture}[node distance=0.4cm and 0.6cm]
+    \node[tkbox, minimum width=3.0cm] (rel) {\textbf{Bloque relacional}\\\scriptsize\texttt{TableRef}, \texttt{ColumnRef}\\\scriptsize Expresiones recursivas\\\scriptsize \texttt{RelationalQuery}};
+    \node[tkboxg, minimum width=3.0cm, right=of rel] (graph) {\textbf{Bloque de grafo}\\\scriptsize\texttt{VertexPattern}\\\scriptsize\texttt{EdgePattern}, \texttt{PathPattern}\\\scriptsize\texttt{MatchPattern}};
+    \node[tkboxo, minimum width=3.0cm, right=of graph] (hyb) {\textbf{Composición híbrida}\\\scriptsize\texttt{FromGraphMatch}\\\scriptsize Encaja en \texttt{FromExpr}\\\scriptsize Tres ámbitos separados};
+    \node[font=\scriptsize\bfseries, below=0.4cm of graph] (link) {Cualquier consulta del alcance es composición de estos tres bloques};
+    \draw[tkarrow, dashed] (graph) -- (link);
+\end{tikzpicture}
+
+\vspace{0.4cm}
+\textbf{Linaje del diseño}
+\begin{itemize}\footnotesize
+    \item \textbf{SemQL}~\parencite{IRNet}: descomposición tipada.
+    \item \textbf{NatSQL}: uniformidad operacional.
+    \item \textbf{RESDSQL}~\parencite{RESDSQL2023}: compilador determinista.
 \end{itemize}
 
-\medskip
+\end{frame}
 
-\textbf{Verificación dinámica.} Si la consulta supera el chequeo estático, se ejecuta sobre DuckPGQ \parencite{DuckPGQ} como \emph{oráculo parcial}: válida, inválida por error, o ejecutable con salida atípica.
+% \begin{frame}{Contrato JSON y cuatro guardas en serie}
+% \textbf{El LLM no puede emitir SQL libre:} la única salida válida del \emph{tool} es una instancia de la RI.
+% \centering
+% \begin{tikzpicture}[node distance=0.35cm]
+%     \node[tkbox, minimum width=2.6cm] (g1) {\scriptsize JSON Schema\\\scriptsize\itshape (SDK valida)};
+%     \node[tkbox, minimum width=2.6cm, right=of g1] (g2) {\scriptsize Parser\\\scriptsize\itshape coherencia con\\\scriptsize\itshape dataclasses};
+%     \node[tkbox, minimum width=2.6cm, right=of g2] (g3) {\scriptsize Verif. estática\\\scriptsize\itshape contra $\Sigma_{\mathrm{proj}}$};
+%     \node[tkboxo, minimum width=2.6cm, right=of g3] (g4) {\scriptsize Verif. dinámica\\\scriptsize\itshape ejecución motor};
+%     \draw[tkarrow] (g1) -- (g2);
+%     \draw[tkarrow] (g2) -- (g3);
+%     \draw[tkarrow] (g3) -- (g4);
+% \end{tikzpicture}
+% \vspace{0.2cm}
 
-\medskip
+% \begin{columns}[T]
+% \begin{column}{0.55\textwidth}
+% \textbf{Cuatro invariantes operativos.}
+% \begin{enumerate}\footnotesize
+%     \item \emph{Inmutabilidad e igualdad estructural} (\texttt{frozen}).
+%     \item \emph{Round-trip lift--compilación}.
+%     \item \emph{Round-trip parse--serialización}: \texttt{parse\_ir(to\_dict(q)) == q}.
+%     \item \emph{Soundness referencial} contra $\Sigma_{\mathrm{proj}}$.
+% \end{enumerate}
+% \end{column}
+% \begin{column}{0.45\textwidth}
+% \begin{alertblock}{Diferencia con auto-corrección estándar}
+% \small La corrección se aplica \emph{ex ante} sobre la RI, antes de que cualquier SQL textual exista, no \emph{ex post} sobre la salida del motor.
+% \end{alertblock}
+% \end{column}
+% \end{columns}
+% \end{frame}
 
-\begin{block}{Política de retroalimentación estructurada}
-El bucle no reenvía al LLM el mensaje crudo del motor, sino un \textbf{descriptor categórico} que se inyecta en la etapa de construcción de la RI. Refuerza P4 (auditabilidad) y P2 (mediación tipada).
+\begin{frame}{Verificación en cascada}
+\centering
+\resizebox{0.95\textwidth}{!}{%
+\begin{tikzpicture}[node distance=0.4cm]
+    % Encabezado de fase
+    \node[font=\scriptsize\bfseries, tkBlue] (lab1) at (0,0) {Verificación estática (4 familias)};
+
+    % Las 4 cajas de verificación estática
+    \node[tkbox, minimum width=3.0cm, minimum height=1.8cm, below=0.2cm of lab1, anchor=north west] (f1) {\scriptsize \textbf{Referencial}\\[1pt]\scriptsize\texttt{unknown\_table}\\\scriptsize\texttt{unknown\_column}\\\scriptsize\texttt{unknown\_*\_label}};
+    \node[tkbox, minimum width=3.0cm, minimum height=1.8cm, right=of f1] (f2) {\scriptsize \textbf{Tipado}\\[1pt]\scriptsize\texttt{type\_mismatch\_}\\\scriptsize\texttt{aggregate}\\\scriptsize\texttt{type\_mismatch\_}\\\scriptsize\texttt{arithmetic}};
+    \node[tkbox, minimum width=3.0cm, minimum height=1.8cm, right=of f2] (f3) {\scriptsize \textbf{Coherencia cruzada}\\[1pt]\scriptsize\texttt{vertex\_label\_}\\\scriptsize\texttt{without\_table}\\\scriptsize\texttt{path\_step\_incoh.}};
+    \node[tkboxr, minimum width=3.0cm, minimum height=1.8cm, right=of f3] (f4) {\scriptsize \textbf{Op. del motor}\\[1pt]\scriptsize\texttt{missing\_vertex\_}\\\scriptsize\texttt{label}\\[2pt]\scriptsize\itshape (flag R7)};
+
+    % Flechas en cascada entre las 4 cajas
+    \draw[tkarrow] (f1) -- (f2);
+    \draw[tkarrow] (f2) -- (f3);
+    \draw[tkarrow] (f3) -- (f4);
+
+    % Verificación dinámica centrada bajo las 4 cajas
+    \node[tkboxo, minimum width=13.5cm, minimum height=1.0cm, below=1.2cm of $(f2)!0.5!(f3)$] (dyn) {\scriptsize \textbf{Verificación dinámica:}\quad ejecución sobre DuckPGQ como \emph{oráculo parcial} (válida / error / salida atípica)};
+
+    % Flecha bajada desde la cascada hacia dyn
+    \draw[tkarrow] (f4.south) -- (f4.south |- dyn.north);
+
+    % Flecha de retroalimentación: del oeste de dyn, hacia afuera, hacia arriba, hacia el oeste de f1
+    \coordinate (fb) at ($(dyn.west)+(-0.7,0)$);
+    \draw[tkarrow, dashed, tkRed] (dyn.west) -- (fb) |- (f1.west);
+    \node[font=\scriptsize\itshape, tkRed, align=center, anchor=east] at ($(fb)+(-0.05,1.2)$) {retroalimentación\\estructurada};
+\end{tikzpicture}%
+}
+
+\vspace{0.3cm}
+\begin{block}{Política de retroalimentación}
+\small El bucle no reenvía al LLM el mensaje crudo del motor. Lo traduce a un \textbf{descriptor categórico} que se inyecta en la etapa de construcción de la RI: vocabulario común, no oscilaciones por texto libre.
 \end{block}
 \end{frame}
 
 % ===================================================================
-\section{Plan experimental y avance}
+\section{Validación}
 % ===================================================================
 
-\begin{frame}{Plan experimental}
+\begin{frame}{Plan experimental: stack, datasets y régimen}
 \begin{columns}[T]
 \begin{column}{0.5\textwidth}
 \textbf{Stack técnico fijado.}
 \begin{itemize}\footnotesize
-    \item \textbf{Motor:} DuckDB 1.4.4 + extensión \texttt{duckpgq}.
-    \item \textbf{LLM inicial:} Claude Haiku 4.5 (sustituible por P5).
+    \item \textbf{Motor:} DuckDB 1.4.4 + extensión \texttt{duckpgq}~\parencite{DuckPGQ}.
+    \item \textbf{LLM:} Claude Haiku 4.5; sustituible bajo P5.
     \item \textbf{Parser SQL:} sqlglot, dialecto \texttt{duckdb}.
     \item \textbf{Entorno:} \texttt{uv} 0.11+, Python 3.11.
-\end{itemize}
-
-\textbf{Datasets y benchmarks.}
-\begin{itemize}\footnotesize
-    \item \textbf{Spider} \parencite{Spider2018}, \textbf{BIRD} \parencite{BIRD2023}: régimen relacional.
-    \item \textbf{Spider 2.0} \parencite{spider2_2025}: régimen empresarial.
-    \item \textbf{Corpus PGQ propio}: régimen híbrido SQL/PGQ.
+    \item \textbf{Marco evaluación canónica:} NL2SQL360~\parencite{SuperSQL2024}.
 \end{itemize}
 \end{column}
 \begin{column}{0.5\textwidth}
-\textbf{Métricas.}
+\textbf{Datasets por régimen}
+\begin{tabular}{@{}lp{3.0cm}@{}}
+\toprule
+\scriptsize\textbf{Régimen} & \scriptsize\textbf{Dataset} \\
+\midrule
+\scriptsize Relacional puro & \scriptsize Spider~\parencite{Spider2018}, BIRD~\parencite{BIRD2023}, Spider 2.0~\parencite{spider2_2025} \\
+\scriptsize Grafo puro (Cypher / ISO-GQL) & \scriptsize Text2GQL-Bench~\parencite{text2gqlbench} \\
+\scriptsize Híbrido SQL/PGQ & \scriptsize Corpus derivado\\
+\bottomrule
+\end{tabular}
+
+\vspace{0.25cm}
+\scriptsize El corpus híbrido se construye \emph{siguiendo la metodología} de Text2GQL-Bench adaptada a SQL/PGQ.
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Comparación contra \emph{baselines}}
+\small
+\begin{table}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{\emph{Baseline}} & \textbf{Anclaje} & \textbf{RI tipada} & \textbf{Verif. cascada} & \textbf{Cobertura SQL/PGQ} \\
+\midrule
+DIN-SQL~\scriptsize\parencite{DINSQL2023}        & {\scriptsize parcial} & \textcolor{tkRed}{\scriptsize no}  & \textcolor{tkRed}{\scriptsize no}    & \textcolor{tkRed}{\scriptsize no} \\
+MAC-SQL~\scriptsize\parencite{MACSQL2023}        & {\scriptsize parcial} & \textcolor{tkRed}{\scriptsize no}  & {\scriptsize ejecución}             & \textcolor{tkRed}{\scriptsize no} \\
+CHESS~\scriptsize\parencite{CHESS2024}           & {\scriptsize sí}      & \textcolor{tkRed}{\scriptsize no}  & {\scriptsize ejecución}             & \textcolor{tkRed}{\scriptsize no} \\
+RSL-SQL~\scriptsize\parencite{RSLSQL2024}        & {\scriptsize sí}      & \textcolor{tkRed}{\scriptsize no}  & {\scriptsize parcial}                & \textcolor{tkRed}{\scriptsize no} \\
+XiYan-SQL~\scriptsize\parencite{XiYanSQL2024}    & {\scriptsize sí}      & {\scriptsize implícita (M-Schema)} & {\scriptsize ejecución}            & \textcolor{tkRed}{\scriptsize no} \\
+STRuCT-LLM~\scriptsize\parencite{STRuCTLLM2025}  & {\scriptsize parcial} & \textcolor{tkRed}{\scriptsize no}  & \textcolor{tkRed}{\scriptsize no}    & {\scriptsize tabular+grafo, no estándar} \\
+\midrule
+\textbf{Esta tesis} & \textcolor{tkGreen}{\textbf{\scriptsize dual}} & \textcolor{tkGreen}{\textbf{\scriptsize sí (IR-SQL/PGQ)}} & \textcolor{tkGreen}{\textbf{\scriptsize estática+dinámica}} & \textcolor{tkGreen}{\textbf{\scriptsize sí (estándar ISO)}} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\end{frame}
+
+\begin{frame}{Métricas, ablations y avance actual}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Métricas reportadas.}
 \begin{itemize}\footnotesize
-    \item \textbf{Canónicas} \parencite{SuperSQL2024}: \emph{Execution Accuracy} (EX), \emph{Exact Match} (EM), \emph{Valid Efficiency Score} (VES).
-    \item \textbf{Propias para SQL/PGQ}: tasa de alucinación referencial, coherencia cruzada, descriptores de error categóricos.
+    \item \textbf{Canónicas:} EX, EM, VES~\parencite{SuperSQL2024}.
+    \item \textbf{Híbrido SQL/PGQ:} alucinación referencial, coherencia cruzada, descriptores categóricos.
+    \item \textbf{Coste por consulta (R8):} invocaciones LLM, \emph{tokens} in/out, iteraciones del bucle, latencia P50/P95, coste monetario.
 \end{itemize}
 
-\textbf{Comparación.}
+\textbf{\emph{Ablations}.}
 \begin{itemize}\footnotesize
-    \item \emph{Baselines} arquitectónicos: CHESS \parencite{CHESS2024}, XiYan-SQL \parencite{XiYanSQL2024}.
-    \item \emph{Ablations}: con/sin RI, con/sin verificación dinámica, con/sin coherencia cruzada.
+    \item Con/sin RI tipada.
+    \item Con/sin verificación dinámica.
+    \item Con/sin coherencia cruzada.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Avance actual.}
+\begin{itemize}\footnotesize
+    \item[\textcolor{tkGreen}{\textbf{\checkmark}}] Dataclasses de IR-SQL/PGQ y JSON Schema.
+    \item[\textcolor{tkGreen}{\textbf{\checkmark}}] Compilador determinista IR $\to$ SQL/PGQ.
+    \item[\textcolor{tkGreen}{\textbf{\checkmark}}] Verificador estático: 4 familias.
+    \item[\textcolor{tkGreen}{\textbf{\checkmark}}] \emph{Lifter} SQL $\to$ IR: 99\% \emph{round-trip}.
+    \item[\textcolor{tkOrange}{\textbf{$\rightarrow$}}] Bucle de retroalimentación con clasificador de errores.
+    \item[\textcolor{tkRed}{$\square$}] Adaptación del corpus a SQL/PGQ.
+    \item[\textcolor{tkRed}{$\square$}] Evaluación canónica con NL2SQL360.
+    \item[\textcolor{tkRed}{$\square$}] \emph{Ablations} sistemáticos.
 \end{itemize}
 \end{column}
 \end{columns}
 \end{frame}
 
-\begin{frame}{Avance actual}
-\textbf{Componentes implementados.}
-\begin{itemize}\small
-    \item Definición de las \emph{dataclasses} de IR-SQL/PGQ y JSON Schema asociado.
-    \item Compilador determinista IR $\to$ SQL/PGQ con generación sistemática de variables de arista (restricción operativa de DuckPGQ).
-    \item Verificador estático con las cuatro familias de chequeo y descriptores canónicos.
-    \item \emph{Lifter} de SQL a RI: 99\% \emph{round-trip} estructural sobre 100 consultas predichas en Spider \emph{dev}.
-\end{itemize}
-
-\medskip
-
-\textbf{Experimentos preliminares.}
-\begin{itemize}\small
-    \item \textbf{Exp.\ 07}: comparativa Haiku 4.5 vs.\ Sonnet 4.6 sobre el \emph{baseline}.
-    \item \textbf{Exp.\ 08--09}: bucle de retroalimentación estructurada con clasificador de errores; corpus PGQ y Spider.
-\end{itemize}
-
-\begin{block}{Hallazgo cualitativo temprano}
-La mediación por RI tipada produce errores \emph{categorizables y reproducibles}, en contraste con la opacidad de los esquemas de auto-corrección sobre SQL textual.
-\end{block}
-\end{frame}
-
-\begin{frame}{Cronograma -- hitos principales}
-\small
-\begin{table}
-    \centering
-    \begin{tabular}{|c|p{6.0cm}|c|c|}
-    \hline
-    \textbf{Fase} & \textbf{Hito} & \textbf{Periodo} & \textbf{Avance} \\
-    \hline
-    \multirow{3}{*}{\rotatebox[origin=c]{90}{\textbf{Parcial 26-1}}}
-        & Plan de tesis: capítulos 1--4 + cronograma & Mar--May 2026 & 55\% \\
-        & Implementación arquitectura v1 (NL $\to$ RI $\to$ consulta) & May--Jun 2026 & 68\% \\
-        & Experimentación preliminar y exposición de avances & Jun 2026 & 80\% \\
-    \hline
-    \rotatebox[origin=c]{90}{\textbf{Inter.}}
-        & Refinamiento arquitectónico y revisión bibliográfica & Jul--Ago 2026 & 82\% \\
-    \hline
-    \multirow{2}{*}{\rotatebox[origin=c]{90}{\textbf{26-2}}}
-        & Ampliación experimental, ablations, análisis de errores & Ago--Oct 2026 & 91\% \\
-        & Redacción final, sustentación & Nov--Dic 2026 & 100\% \\
-    \hline
-    \end{tabular}
-\end{table}
-\centering
-\textbf{Estado actual}: cierre de Plan de Tesis y diapositivas de exposición parcial.
-\end{frame}
-
 % ===================================================================
-\section{Conclusiones}
+\section{Estado y siguientes pasos}
 % ===================================================================
 
-\begin{frame}{Conclusiones provisionales y trabajo futuro}
-\textbf{Conclusiones provisionales.}
+
+
+
+\begin{frame}{Estado y siguientes pasos}
+\textbf{Estado actual.}
 \begin{itemize}\small
-    \item Existe una brecha clara: las técnicas de mitigación de alucinaciones están \emph{fragmentadas} y no cubren el régimen híbrido SQL/PGQ.
-    \item La \textbf{mediación por RI tipada} traslada al espacio de la representación los errores que actualmente se detectan tarde (o no se detectan) sobre SQL textual.
-    \item El prototipo demuestra factibilidad técnica: lifter, compilador determinista y verificador estático integrados sobre DuckPGQ.
+    \item Brecha confirmada: las técnicas de mitigación de alucinaciones están fragmentadas y no cubren el régimen híbrido SQL/PGQ (Cuadro de \emph{baselines}).
+    \item La mediación por RI tipada traslada al espacio de la representación errores que en la práctica común se detectan tarde o se ocultan tras retroalimentación textual.
+    \item Prototipo funcional: \emph{lifter}, compilador determinista y verificador estático integrados sobre DuckPGQ.
 \end{itemize}
 
-\medskip
-
-\textbf{Trabajo futuro.}
+\vspace{0.2cm}
+\textbf{Siguientes pasos.}
 \begin{itemize}\small
-    \item Cierre del corpus PGQ propio para evaluación canónica del régimen híbrido.
-    \item Ampliación de la cobertura de la RI (\emph{window functions}, mecanismos de ambigüedad inspirados en \cite{AmbiSQL}).
+    \item Ampliación de la cobertura de la RI: \emph{window functions} y mecanismos de ambigüedad inspirados en~\parencite{AmbiSQL}.
     \item \emph{Ablations} sistemáticos sobre el bucle de verificación.
-    \item Evaluación con LLMs adicionales (Sonnet 4.6, GPT, Gemini) bajo P5.
+    \item Evaluación con LLMs adicionales bajo P5; reporte de coste agregado por consulta (R8).
 \end{itemize}
+
 \end{frame}
+
+\section*{}
 
 \begin{frame}[plain]
     \vfill
@@ -436,3 +532,42 @@ La mediación por RI tipada produce errores \emph{categorizables y reproducibles
 \end{frame}
 
 \end{document}
+
+% \begin{frame}{Cronograma}
+% \centering
+% \resizebox{0.96\textwidth}{!}{%
+% \begin{tikzpicture}[node distance=0.05cm]
+%     % Eje temporal
+%     \draw[tkarrow, very thick] (0,0) -- (12,0);
+%     \foreach \x/\m in {0.5/Mar, 2/May, 3.5/Jun, 5/Ago, 6.5/Oct, 8/Dic, 9.5/, 11/} {
+%         \draw (\x,0.1) -- (\x,-0.1);
+%         \node[font=\tiny, below=0.1cm] at (\x,0) {\m};
+%     }
+
+%     % Hitos parcial 26-1
+%     \node[tkbox, minimum width=3cm, minimum height=0.7cm, above=0.5cm] at (1.5,0) (h1) {\scriptsize Plan de tesis 1--4 + propuesta};
+%     \node[tkbox, minimum width=2.5cm, minimum height=0.7cm, above=2cm] at (3,0) (h2) {\scriptsize Implementación v1 (NL$\to$IR$\to$SQL)};
+%     \node[tkboxo, minimum width=2cm, minimum height=0.7cm, above=0.5cm] at (4,0) (h3) {\scriptsize Avances Jun};
+
+%     % Hitos 26-2
+%     \node[tkbox, minimum width=2.5cm, minimum height=0.7cm, above=2cm] at (6,0) (h4) {\scriptsize Refinamiento};
+%     \node[tkbox, minimum width=2.5cm, minimum height=0.7cm, above=0.5cm] at (8,0) (h5) {\scriptsize Ampliación experimental + ablations};
+%     \node[tkboxr, minimum width=2cm, minimum height=0.7cm, above=2cm] at (10,0) (h6) {\scriptsize Sustentación};
+
+%     \draw[tkarrow, dashed] (h1.south) -- ($(1.5,0)$);
+%     \draw[tkarrow, dashed] (h2.south) -- ($(3,0)$);
+%     \draw[tkarrow, dashed] (h3.south) -- ($(4,0)$);
+%     \draw[tkarrow, dashed] (h4.south) -- ($(6,0)$);
+%     \draw[tkarrow, dashed] (h5.south) -- ($(8,0)$);
+%     \draw[tkarrow, dashed] (h6.south) -- ($(10,0)$);
+% \end{tikzpicture}%
+% }
+
+% \vspace{0.6cm}
+% \small
+% \begin{tabular}{@{}rl@{}}
+% \textbf{Estado actual:} & cierre de Plan de Tesis y diapositivas de exposición parcial \\
+% \textbf{Próximo hito:} & exposición de avances semana del 28 jun -- 4 jul 2026 (80\% acumulado) \\
+% \textbf{Hito final:} & sustentación entre el 1 y el 12 dic 2026 (100\% acumulado) \\
+% \end{tabular}
+% \end{frame}

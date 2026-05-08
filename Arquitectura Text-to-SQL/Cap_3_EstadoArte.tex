@@ -76,6 +76,24 @@ La mayoría de los sistemas recientes basados en \acp{LLM} se ubica en esta subc
 
 DIN-SQL~\cite{DIN-SQL2023} es uno de los trabajos influyentes en esta línea. Su propuesta descompone la tarea en subpasos y diseña \emph{prompts} específicos para cada uno, apoyados en ejemplos seleccionados manualmente. Enfoques posteriores o relacionados, como DAIL-SQL~\cite{DAIL-SQL2023}, ACT-SQL~\cite{ACT-SQL2023}, PET-SQL~\cite{PET-SQL2024}, DEA-SQL~\cite{DEA-SQL2024}, RSL-SQL~\cite{RSL-SQL2024}, CHESS~\cite{CHESS2024}, MAC-SQL~\cite{MAC-SQL2023}, TA-SQL~\cite{TA-SQL2024}, CoE-SQL~\cite{CoE-SQL2024}, PURPLE~\cite{PURPLE2024}, ODIS~\cite{ODIS2023}, Gen-SQL~\cite{Gen-SQL2025}, SGU-SQL~\cite{SGU-SQL2025}, CRED-SQL~\cite{CRED-SQL2025} y CRUSH4SQL~\cite{CRUSH4SQL2023}, entre otros, mantienen esta lógica general, aunque la combinan con distintas formas de descomposición, recuperación, verificación o refinamiento.
 
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en \emph{few-shot in-context learning}, agrupados por mecanismo principal con el que combinan los ejemplos en el \emph{prompt}.}
+\label{tab:sota-d1-fewshot}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Mecanismo combinado} & \textbf{Trabajos} \\
+\midrule
+Descomposición + \emph{prompts} por etapa & DIN-SQL, DEA-SQL, RSL-SQL, TA-SQL \\
+Organización multiagente & MAC-SQL, CHESS \\
+Cadena de pensamiento (CoT) & DAIL-SQL, ACT-SQL, ODIS, PET-SQL, CoE-SQL, CRED-SQL \\
+Selección o reordenamiento de candidatos & PURPLE, Gen-SQL, SGU-SQL \\
+Recuperación enfocada de esquema & CRUSH4SQL \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 La amplitud de trabajos en esta subcategoría muestra la madurez del paradigma de aprendizaje en contexto. No obstante, también evidencia una limitación: muchas mejoras dependen de ajustes en la ingeniería de \emph{prompts}, la selección de ejemplos o la organización del contexto, más que de cambios profundos en la arquitectura del sistema.
 
 \paragraph{(c) Aprendizaje en contexto dinámico con recuperación.} 
@@ -107,6 +125,24 @@ dominaron los rankings de los benchmarks controlados durante el período
 pre-LLM (2017--2022); su costo de entrenamiento y su dependencia del dominio
 de entrenamiento limitan, sin embargo, su transferencia directa a entornos
 empresariales.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos de \emph{fine-tuning} supervisado, agrupados por la arquitectura base sobre la que aplican el ajuste.}
+\label{tab:sota-d1-finetune}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Arquitectura base} & \textbf{Trabajos} \\
+\midrule
+Redes seq2seq dedicadas & Seq2SQL, BRIDGE, RAT-SQL, SmBoP, RaSaP \\
+Codificadores con atención al esquema & RASAT, S$^{2}$SQL, SHiP \\
+Variantes de T5 adaptadas & PICARD, Graphix-T5, RESDSQL, T5-3B+NatSQL \\
+Generación composicional o por plantilla & SQLFormer, CatSQL \\
+Pipeline modular con etapa ajustada & DTS-SQL \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \paragraph{(b) Preentrenamiento continuo.} CodeS~\cite{CodeS2024} representa
 una variante intermedia: parte de un modelo de código preentrenado de
@@ -166,7 +202,7 @@ ausencia de mecanismos formales para garantizar que la salida respete
 el esquema. La investigación de la presente tesis se posiciona como
 agnóstica al paradigma de aprendizaje subyacente: el énfasis se traslada
 a la representación intermedia y al bucle de verificación, de modo que
-la corrección estructural no descanse exclusivamente en la calidad
+la corrección estructural no descanse exclusivamente en la calidad % LLM-like: maximizador:"exclusivamente"
 estadística del generador.
 
 \section{Arquitectura del Sistema}
@@ -200,6 +236,24 @@ inferencia. La ventaja principal de esta organización es la simplicidad
 operativa; la desventaja es que cualquier error se propaga sin posibilidad
 de inspección intermedia ni de intervención modular.
 
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en arquitecturas monolíticas, agrupados por época y por la familia de modelos sobre la que operan.}
+\label{tab:sota-d2-monoliticas}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Familia / período} & \textbf{Trabajos} \\
+\midrule
+Seq2seq y codificadores dedicados (pre-LLM) & Seq2SQL, BRIDGE, RAT-SQL, SmBoP, RaSaP, RASAT, S$^{2}$SQL, SHiP \\
+Variantes de T5 (pre-LLM) & PICARD, Graphix-T5, T5-3B+NatSQL \\
+Generación composicional o por plantilla & SQLFormer, CatSQL \\
+\acp{LLM} \emph{in-context} con generación de un solo paso & DAIL-SQL, ACT-SQL, ODIS, SGU-SQL \\
+Modelos grandes especializados en SQL o consulta estructurada & CodeS, STRuCT-LLM \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Pipelines modulares}
 \label{subsec:sota-d2-pipelines}
 
@@ -223,6 +277,27 @@ inspección, el reemplazo de componentes y la integración con sistemas de
 verificación, lo que los hace especialmente atractivos para entornos
 empresariales. Su limitación principal es la rigidez del orden de
 ejecución y la posible amplificación de errores entre etapas.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en \emph{pipelines} modulares, agrupados por el foco principal del pipeline.}
+\label{tab:sota-d2-pipelines}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Foco principal del pipeline} & \textbf{Trabajos} \\
+\midrule
+\emph{Schema linking} dedicado & RESDSQL, DTS-SQL, CRUSH4SQL, TA-SQL \\
+Descomposición y refinamiento iterativo & DIN-SQL, DEA-SQL, RSL-SQL, PURPLE \\
+Razonamiento con cadena de pensamiento & PET-SQL, SuperSQL, CoE-SQL, CRED-SQL \\
+Especialización de dominio o adaptabilidad & FinSQL, ZeroNL2SQL \\
+Verificación, selección o composición & CHESS, SelECT-SQL, Gen-SQL, BLENDSQL \\
+Plan estructurado sobre el grafo del esquema & SteinerSQL \\
+Aprendizaje multi-tarea & TKK \\
+Otros (sistemas comerciales o exploratorios) & C3-SQL, Wren AI \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Arquitecturas multiagente}
 \label{subsec:sota-d2-multiagente}
@@ -450,7 +525,7 @@ empresariales y, especialmente, en consultas híbridas sobre el estándar
 de alucinaciones estructurales: no existe una capa intermedia donde
 verificar la consistencia de tipos, la validez de las uniones o la
 coherencia entre los componentes relacionales y de patrón de grafo.
-La investigación de esta tesis se posiciona deliberadamente en la
+La investigación de esta tesis se posiciona deliberadamente en la % LLM-like: cliché-LLM:"deliberadamente"
 sub-categoría de RI explícita con compilación determinista, ampliada
 para cubrir tanto SQL como PGQ y enriquecida con verificación estática
 sobre la propia RI.
@@ -480,6 +555,23 @@ CRUSH4SQL~\cite{CRUSH4SQL2023}, entre otros, dedican un módulo o etapa
 específica al \emph{schema linking}. La calidad de esta etapa se
 correlaciona fuertemente con la corrección final del sistema, lo que
 explica la atención sostenida que ha recibido.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en \emph{schema linking}, agrupados por la forma en que integran la operación en su arquitectura.}
+\label{tab:sota-d4-schemalinking}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Forma de integración} & \textbf{Trabajos} \\
+\midrule
+Atención sensible a relaciones del esquema & RAT-SQL \\
+Módulo dedicado pre-generación & RESDSQL, DTS-SQL, CRUSH4SQL, TS-SQL \\
+Etapa explícita en pipeline modular & DIN-SQL, DEA-SQL, RSL-SQL, TA-SQL, PURPLE \\
+Agente especializado en selección de esquema & CHESS, MAC-SQL \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Recuperación de contenido de la base de datos}
 \label{subsec:sota-d4-content}
@@ -527,15 +619,33 @@ variantes de este mecanismo. Los trabajos sobre detección de errores
 ---ErrorLLM~\cite{errorllm2026}, SQLHD~\cite{SQLHD2025},
 AmbiSQL~\cite{AmbiSQL}--- proveen señales que, en principio, podrían
 alimentar el bucle de auto-refinamiento. La eficacia del mecanismo
-depende crucialmente de la naturaleza de la retroalimentación: cuando
+depende crucialmente de la naturaleza de la retroalimentación: cuando % LLM-like: maximizador:"crucialmente"
 es texto libre, tiende a inducir oscilaciones; cuando es estructurada,
 puede converger más rápidamente.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en auto-refinamiento, agrupados por el tipo de retroalimentación que alimenta el ciclo.}
+\label{tab:sota-d4-refinement}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Tipo de retroalimentación} & \textbf{Trabajos} \\
+\midrule
+Auto-corrección sobre texto libre & DIN-SQL, DEA-SQL, RSL-SQL, PURPLE \\
+Verificación por agente dedicado & CHESS, MAC-SQL, OpenSearch-SQL \\
+Selección entre candidatos refinados & XiYan-SQL, CHASE-SQL \\
+Detección o clasificación de errores & ErrorLLM, SQLHD \\
+Resolución iterativa de ambigüedad & AmbiSQL \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Observaciones críticas}
 \label{subsec:sota-d4-obs}
 
 El \emph{schema linking} es el mecanismo más estudiado, mientras que la
-integración de conocimiento externo de dominio es claramente el menos
+integración de conocimiento externo de dominio es claramente el menos % LLM-like: maximizador:"claramente"
 desarrollado pese a su relevancia empresarial directa. El
 auto-refinamiento ha proliferado, pero la mayoría de las
 implementaciones operan sobre la consulta final como texto, lo que
@@ -568,6 +678,22 @@ y CodeS~\cite{CodeS2024}. Estos sistemas confían el razonamiento al
 proceso interno del modelo y a las representaciones intermedias
 implícitas que aprende durante el entrenamiento.
 
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en razonamiento directo, agrupados por la familia del modelo de referencia.}
+\label{tab:sota-d5-directo}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Familia del modelo} & \textbf{Trabajos} \\
+\midrule
+Modelos seq2seq dedicados & Seq2SQL, BRIDGE, RAT-SQL, RASAT \\
+Variantes de T5 con decodificación restringida o sensible al esquema & PICARD, Graphix-T5, RESDSQL, T5-3B+NatSQL \\
+Modelo de código preentrenado y especializado en SQL & CodeS \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Cadena de pensamiento}
 \label{subsec:sota-d5-cot}
 
@@ -597,6 +723,23 @@ descomposición es coherente con la observación práctica de que las
 consultas complejas se resuelven mejor cuando se atacan por partes,
 aunque introduce el riesgo de descomposiciones incorrectas que
 arrastran errores difíciles de localizar.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en razonamiento descompositivo, agrupados por la unidad de descomposición que el sistema utiliza.}
+\label{tab:sota-d5-descompositivo}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Unidad de descomposición} & \textbf{Trabajos} \\
+\midrule
+Sub-preguntas a sub-consultas SQL & DIN-SQL, DEA-SQL, RSL-SQL \\
+Roles de agentes especializados & MAC-SQL, CHESS \\
+Anclaje a tabla previo a la generación & TA-SQL, SuperSQL \\
+Plan de ejecución estructurado sobre el grafo del esquema & SteinerSQL \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Razonamiento de múltiples caminos}
 \label{subsec:sota-d5-multipath}
@@ -628,6 +771,24 @@ ciclos. AmbiSQL~\cite{AmbiSQL} aborda iterativamente la resolución de
 ambigüedades en interacción con el usuario. La efectividad del
 paradigma depende de que la retroalimentación sea informativa y
 discriminante; en su ausencia, el ciclo puede oscilar sin converger.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\caption{Trabajos representativos en razonamiento de retroalimentación iterativa, agrupados por la fuente que alimenta el ciclo de refinamiento.}
+\label{tab:sota-d5-iterativo}
+\begin{tabular}{@{}p{0.32\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{Fuente del ciclo} & \textbf{Trabajos} \\
+\midrule
+Agente verificador o \emph{unit tester} & CHESS, MAC-SQL \\
+Error de ejecución sobre el motor & OpenSearch-SQL, DIN-SQL, DEA-SQL, RSL-SQL \\
+Selección iterativa entre múltiples caminos & CHASE-SQL \\
+Modelo dedicado de detección de errores & ErrorLLM, SQLHD \\
+Interacción iterativa con el usuario & AmbiSQL \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Observaciones críticas}
 \label{subsec:sota-d5-obs}
@@ -798,12 +959,20 @@ observaciones de síntesis.
     2017 y 2026, con búsquedas combinando los términos
     \emph{text-to-SQL}, \emph{text-to-query}, \emph{SQL/PGQ},
     \emph{property graph}, \emph{hybrid graph relational query} y sus
-    variantes.} STRuCT-LLM~\cite{STRuCT-LLM2025} y
-    text2gqlbench~\cite{text2gqlbench} se aproximan al razonamiento
-    sobre grafos, pero no contemplan la dualidad relacional/grafo
-    propia de \ac{SQL}/\ac{PGQ}. Otros trabajos como
-    SchemaGraphSQL~\cite{SchemaGraphSQL} se sitúan en la frontera, pero
-    sin abordar la generación bajo el estándar híbrido.
+    variantes.} STRuCT-LLM~\cite{STRuCT-LLM2025} se aproxima al
+    razonamiento conjunto sobre tablas y grafos, pero no produce
+    \ac{SQL}/\ac{PGQ} estandarizado y verificable.
+    Text2GQL-Bench~\cite{text2gqlbench} provee evaluación canónica
+    multi-lenguaje sobre Cypher e ISO-GQL, pero opera sobre consultas
+    de grafo puras y no contempla la dualidad relacional/grafo propia
+    de \ac{SQL}/\ac{PGQ}; aun así, su metodología de construcción de
+    \emph{benchmarks} (traducción de esquemas, conversión de datos,
+    traducción de consultas y generación jerárquica de preguntas)
+    constituye la referencia metodológica más cercana para la
+    construcción de un corpus específico del régimen híbrido. Otros
+    trabajos como SchemaGraphSQL~\cite{SchemaGraphSQL} se sitúan en
+    la frontera, pero sin abordar la generación bajo el estándar
+    híbrido.
 \end{enumerate}
 
 De la conjunción de estas cinco observaciones se desprende una brecha
@@ -819,6 +988,97 @@ bucle de verificación que opere a nivel de RI con retroalimentación
 estructurada en lugar de texto libre; y (iv) propiedades evaluativas
 que prioricen la interpretabilidad y la robustez junto con la
 corrección. El siguiente capítulo presenta la propuesta de la tesis,
-cuyo objetivo es articular estos cuatro componentes en una arquitectura
+cuyo objetivo es articular estos cuatro componentes en una arquitectura % LLM-like: cliché-LLM:"articular"
 coherente que aborde explícitamente la generación confiable de
 consultas \ac{SQL}/\ac{PGQ} a partir de lenguaje natural.
+
+\section{Mapa tabular del estado del arte}
+\label{sec:sota-tabla}
+
+Las secciones anteriores discutieron los trabajos representativos por dimensión y enunciaron observaciones críticas sobre cada eje. El Cuadro~\ref{tab:sota-mapa} consolida la posición de los trabajos analizados a lo largo de las seis dimensiones del marco taxonómico de la Sección~\ref{sec:sota-taxonomia}, ofreciendo una vista panorámica complementaria a la discusión en prosa. Las filas siguen un orden cronológico y las celdas emplean códigos abreviados; la leyenda completa de códigos figura al pie del cuadro. Cuando un trabajo se posiciona en más de una sub-categoría dentro de una misma dimensión, las etiquetas correspondientes se separan por comas. La marca \texttt{---} indica que la dimensión no fue objeto explícito del trabajo o que la asignación no resultó decidible a partir del material publicado.
+
+\renewcommand{\arraystretch}{1.1}
+{\scriptsize
+\begin{longtable}{@{}llcccccc@{}}
+\caption{Mapa tabular del estado del arte en \emph{text-to-query}. Cada fila clasifica un trabajo en las seis dimensiones del marco taxonómico de la Sección~\ref{sec:sota-taxonomia}.\protect\\
+\textbf{D1 Aprendizaje}: F0 zero-shot, FF few-shot, FD few-shot dinámico, TF fine-tuning supervisado, TC preentrenamiento continuo, TM multi-tarea, TR aprendizaje por refuerzo, H híbrido. \textbf{D2 Arquitectura}: M monolítica, PM pipeline modular, MA multiagente, AS agentic-search, RR reranking. \textbf{D3 RI}: --- sin RI explícita, EI esquema como RI implícita, LD lenguaje intermedio dedicado, PE plan estructurado, AB árbol abstracto, DD descomposición declarativa. \textbf{D4 Enriquecimiento}: SL schema linking, CR content retrieval, EK external knowledge, AR auto-refinamiento. \textbf{D5 Razonamiento}: D directo, CoT cadena de pensamiento, Dc descompositivo, MC multi-camino, It iterativo. \textbf{D6 Propiedades}: C corrección, Ef eficiencia, R robustez, Ad adaptabilidad, Es escalabilidad, In interpretabilidad.}
+\label{tab:sota-mapa}\\
+\toprule
+\textbf{Sistema} & \textbf{Año} & \textbf{D1} & \textbf{D2} & \textbf{D3} & \textbf{D4} & \textbf{D5} & \textbf{D6} \\
+\midrule
+\endfirsthead
+
+\multicolumn{8}{l}{\emph{(Cuadro~\ref{tab:sota-mapa}, continúa de la página anterior)}}\\
+\toprule
+\textbf{Sistema} & \textbf{Año} & \textbf{D1} & \textbf{D2} & \textbf{D3} & \textbf{D4} & \textbf{D5} & \textbf{D6} \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{8}{r}{\emph{(continúa en la página siguiente)}}\\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+Seq2SQL~\cite{Seq2SQL2017}              & 2017 & TF, TR     & M       & ---     & ---       & D       & C       \\
+IRNet/SemQL~\cite{guo2019irnet}         & 2019 & TF         & PM      & LD      & ---       & D       & C, In   \\
+BRIDGE~\cite{BRIDGE2020}                & 2020 & TF         & M       & ---     & CR        & D       & C       \\
+NatSQL~\cite{gan2021natsql}             & 2021 & TF         & M       & LD      & ---       & D       & C, In   \\
+RAT-SQL~\cite{RAT-SQL2021}              & 2021 & TF         & M       & EI      & SL        & D       & C       \\
+RaSaP~\cite{RaSaP2021}                  & 2021 & TF         & M       & AB      & ---       & D       & C       \\
+SmBoP~\cite{SmBoP2021}                  & 2021 & TF         & M       & AB      & ---       & D       & C       \\
+Graphix-T5~\cite{Graphix-T52022}        & 2022 & TF         & M       & EI      & SL        & D       & C       \\
+PICARD~\cite{PICARD2022}                & 2022 & TF         & M       & AB      & ---       & D       & C       \\
+RASAT~\cite{RASAT2022}                  & 2022 & TF         & M       & ---     & ---       & D       & C       \\
+S$^{2}$SQL~\cite{S2SQL2022}             & 2022 & TF         & M       & EI      & SL        & D       & C       \\
+SHiP~\cite{SHiP2022}                    & 2022 & TF         & M       & ---     & ---       & D       & C       \\
+TKK~\cite{TKK2022}                      & 2022 & TM         & PM      & ---     & SL        & D       & C       \\
+ACT-SQL~\cite{ACT-SQL2023}              & 2023 & FF         & M       & ---     & ---       & CoT     & C       \\
+C3-SQL~\cite{C3-SQL2023}                & 2023 & F0         & PM      & ---     & ---       & D       & C       \\
+CatSQL~\cite{CatSQL2023}                & 2023 & TF         & M       & LD      & ---       & D       & C       \\
+CRUSH4SQL~\cite{CRUSH4SQL2023}          & 2023 & FF         & PM      & ---     & SL        & D       & C, Es   \\
+DAIL-SQL~\cite{DAIL-SQL2023}            & 2023 & FF         & M       & ---     & ---       & CoT     & C       \\
+DIN-SQL~\cite{DIN-SQL2023}              & 2023 & FF         & PM      & DD      & SL, AR    & Dc, It  & C, In   \\
+G$^{3}$R~\cite{G3R2023}                 & 2023 & TF         & RR      & ---     & ---       & MC      & C       \\
+MAC-SQL~\cite{MAC-SQL2023}              & 2023 & FF         & MA      & DD      & SL, AR    & Dc, It  & C, In   \\
+ODIS~\cite{ODIS2023}                    & 2023 & FF         & M       & ---     & ---       & CoT     & C       \\
+RESDSQL~\cite{RESDSQL2023}              & 2023 & TF         & PM      & ---     & SL        & D       & C       \\
+SelECT-SQL/SC-Prompt~\cite{SC-Prompt2023} & 2023 & FF       & PM      & ---     & ---       & D       & C       \\
+SQLFormer~\cite{SQLFormer2023}          & 2023 & TF         & M       & PE, AB  & ---       & D       & C       \\
+T5-3B+NatSQL~\cite{T5-3B+NatSQL+TokenPreprocessing2023} & 2023 & TF & M & LD & ---  & D       & C       \\
+CHESS~\cite{CHESS2024}                  & 2024 & FF         & MA      & DD      & SL, CR, AR & Dc, It & C, In   \\
+CodeS~\cite{CodeS2024}                  & 2024 & TC         & M       & ---     & ---       & D       & C, Es   \\
+CoE-SQL~\cite{CoE-SQL2024}              & 2024 & FF         & PM      & ---     & ---       & CoT     & C       \\
+DEA-SQL~\cite{DEA-SQL2024}              & 2024 & FF         & PM      & ---     & SL, AR    & Dc, It  & C       \\
+DTS-SQL~\cite{DTS-SQL2024}              & 2024 & TF         & PM      & ---     & SL        & D       & C       \\
+FinSQL~\cite{FinSQL2024}                & 2024 & TF         & PM      & ---     & CR        & D       & C, Ef, Ad \\
+MetaSQL~\cite{MetaSQL2024}              & 2024 & H          & RR      & ---     & ---       & MC      & C       \\
+PET-SQL~\cite{PET-SQL2024}              & 2024 & FF         & PM      & ---     & CR        & CoT     & C, Ef   \\
+PURPLE~\cite{PURPLE2024}                & 2024 & FF         & PM      & ---     & SL, AR    & It      & C       \\
+RSL-SQL~\cite{RSL-SQL2024}              & 2024 & FF         & PM      & ---     & SL, AR    & Dc, It  & C       \\
+SuperSQL~\cite{SuperSQL2024}            & 2024 & FF         & PM      & ---     & CR        & CoT, Dc & C, Ef   \\
+TA-SQL~\cite{TA-SQL2024}                & 2024 & FF         & PM      & ---     & SL        & Dc      & C       \\
+XiYan-SQL~\cite{XiYan-SQL2024}          & 2024 & H          & MA, RR  & EI      & CR, AR    & MC, It  & C       \\
+ZeroNL2SQL~\cite{ZeroNL2SQL2024}        & 2024 & H          & PM      & LD      & ---       & D       & C, Ad   \\
+Alpha-SQL~\cite{Alpha-SQL2025}          & 2025 & F0         & AS      & ---     & AR        & It      & C       \\
+BLENDSQL~\cite{BLENDSQL2025}            & 2025 & FF         & PM      & ---     & ---       & D       & C       \\
+CHASE-SQL~\cite{CHASE-SQL2025}          & 2025 & H          & MA, RR, AS & ---  & CR, AR    & MC, It  & C, Es   \\
+CRED-SQL~\cite{CRED-SQL2025}            & 2025 & FF, FD     & PM      & ---     & CR        & CoT     & C, Ad   \\
+Gen-SQL~\cite{Gen-SQL2025}              & 2025 & FF         & PM      & ---     & ---       & D       & C       \\
+OpenSearch-SQL~\cite{OpenSearch-SQL2025} & 2025 & FD        & MA      & ---     & CR, AR    & It      & C       \\
+PARSQL~\cite{PARSQL2025}                & 2025 & TM         & RR      & ---     & ---       & MC      & C       \\
+ROUTE~\cite{ROUTE2025}                  & 2025 & TM         & PM      & ---     & EK        & D       & R       \\
+SGU-SQL~\cite{SGU-SQL2025}              & 2025 & FF         & M       & ---     & SL        & D       & C       \\
+SQLHD~\cite{SQLHD2025}                  & 2025 & ---        & ---     & ---     & AR        & It      & R       \\
+STRuCT-LLM~\cite{STRuCT-LLM2025}        & 2025 & TR         & M       & ---     & ---       & D       & C       \\
+SteinerSQL~\cite{SteinerSQL2025}        & 2025 & FF         & PM      & PE      & SL        & Dc      & C       \\
+TS-SQL~\cite{TS-SQL2025}                & 2025 & FF         & MA      & ---     & SL        & Dc      & C       \\
+Wren AI~\cite{WrenAI2025}               & 2025 & FF         & PM      & ---     & ---       & D, It   & C       \\
+ErrorLLM~\cite{errorllm2026}            & 2026 & ---        & ---     & ---     & AR        & It      & R       \\
+
+\end{longtable}
+}
+\renewcommand{\arraystretch}{1.0}
+
+El cuadro hace evidentes tres patrones que la discusión en prosa solo describe parcialmente. Primero, la concentración de los trabajos recientes (2024--2026) en arquitecturas modulares y multiagente con razonamiento descompositivo o iterativo, en contraste con el predominio de configuraciones monolíticas y razonamiento directo en el período 2017--2022. Segundo, la persistencia de la columna D3 con el valor \texttt{---} en la mayoría de los sistemas posteriores a 2022, evidencia de que la representación intermedia explícita ha sido una opción minoritaria frente a la decodificación libre. Tercero, la columna D6 muestra una concentración casi exclusiva en \emph{C} (corrección), con una presencia muy puntual de las propiedades restantes; el contraste con las exigencias del entorno empresarial es uno de los argumentos centrales que articula la propuesta del Capítulo~\ref{chap:proposal}. % LLM-like: cliché-LLM:"articula"

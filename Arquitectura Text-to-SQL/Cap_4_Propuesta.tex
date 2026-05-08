@@ -2,16 +2,16 @@
 \chapter{Propuesta: Arquitectura basada en Representación Intermedia para Generación Confiable de Consultas SQL/PGQ}
 \label{chap:proposal}
 
-A través del desarrollo de los anteriores capítulos, podemos evidenciar una brecha de investigación claramente formulada: Las propuestas en el campo de text-to-query disponen de piezas maduras para abordar facetas individuales del problema \emph{text-to-query}, como pueden ser: la descomposición del proceso de generación en etapas, la decodificación sujeta a restricciones, la verificación por ejecución y el enlazamiento con el esquema. 
+A través del desarrollo de los anteriores capítulos, podemos evidenciar una brecha de investigación claramente formulada: Las propuestas en el campo de text-to-query disponen de piezas maduras para abordar facetas individuales del problema \emph{text-to-query}, como pueden ser: la descomposición del proceso de generación en etapas, la decodificación sujeta a restricciones, la verificación por ejecución y el enlazamiento con el esquema.  % LLM-like: maximizador:"claramente"
 
 No obstante, tales mecanismos han sido estudiados principalmente de manera fragmentada y sin tomar en consideración la aplicación extendida a consultas híbridas que combinen el paradigma relacional con relaciones de grafo conforme al estándar \ac{SQL}/\ac{PGQ}~\cite{ISO9075_16_2023}, el cual es uno de los estandáres con mayor interés creciente actualmente en la industria. A partir de esta observación, el presente capítulo desarrolla la propuesta de investigación orientada a cerrar dicha brecha mediante una integración arquitectónica de estos aportes en el contexto de la generación de consultas empresariales sobre esquemas híbridos.
 
-La propuesta se presenta como un trabajo experimental e incremental, siendo que se articula una arquitectura cuya implementación se construye por fases debidamente delimitadas sobre componentes preexistentes revisados en al literatura. 
+La propuesta se presenta como un trabajo experimental e incremental, siendo que se articula una arquitectura cuya implementación se construye por fases debidamente delimitadas sobre componentes preexistentes revisados en al literatura.  % LLM-like: cliché-LLM:"articula"
 
 \section{Bases técnicas y criterios de selección}
 \label{sec:prop-bases}
 
-Para desarrollar la propuesta se tomaron como base seis elementos del estado del arte y del ecosistema de bases de datos: tres provenientes de la literatura \emph{text-to-SQL} (XiYan-SQL, CHESS, RSL-SQL), uno del ecosistema relacional con extensión a grafos (DuckDB con la extensión DuckPGQ), uno como marco de evaluación canónico (NL2SQL360) y uno como infraestructura de análisis estático de SQL (sqlglot). Estos elementos no se eligieron por exhaustividad sino por satisfacer simultáneamente cinco criterios, formulados aquí de manera explícita para que la decisión sea reproducible:
+Para desarrollar la propuesta se tomaron como base siete elementos del estado del arte y del ecosistema de bases de datos: tres provenientes de la literatura \emph{text-to-SQL} (XiYan-SQL, CHESS, RSL-SQL), uno del ecosistema relacional con extensión a grafos (DuckDB con la extensión DuckPGQ), dos como marcos de evaluación canónica para regímenes complementarios (NL2SQL360 para el régimen relacional, Text2GQL-Bench para el régimen de grafo) y uno como infraestructura de análisis estático de SQL (sqlglot). Estos elementos no se eligieron por exhaustividad sino por satisfacer simultáneamente cinco criterios, formulados aquí de manera explícita para que la decisión sea reproducible:
 
 \begin{enumerate}
     \item \textbf{Cobertura conceptual de al menos una dimensión del marco taxonómico.} Cada base aborda con detalle al menos una de las seis dimensiones definidas en la Sección~\ref{sec:sota-taxonomia} (paradigma de aprendizaje, arquitectura, representación, enriquecimiento, razonamiento o evaluación), de modo que la integración de las bases cubre el espectro relevante para la propuesta.
@@ -23,7 +23,7 @@ Para desarrollar la propuesta se tomaron como base seis elementos del estado del
 
 A continuación se describe cada base, con la razón específica que motiva su elección además de los criterios comunes anteriores.
 
-\paragraph{XiYan-SQL~\cite{XiYan-SQL2024}.} Sistema multi-generador de \emph{text-to-SQL}, del cual se reutiliza, en primera instancia, la representación \textbf{M-Schema}: un formato semi-estructurado del esquema relacional que combina nombres, tipos, claves primarias, claves foráneas y muestras de valores en un bloque presentable directamente al \ac{LLM}. M-Schema es una de las representaciones de esquema más adoptadas en la literatura reciente, y constituye el punto de partida natural para extender el formato a esquemas duales. El propio repositorio público de XiYan-SQL es un meta-repositorio que enlaza a los componentes ejecutables (modelos \texttt{XiYanSQL-QwenCoder}, marco de entrenamiento, servidores MCP); este hecho, descubierto durante la fase de integración, condicionó la decisión de incorporar XiYan-SQL primero como referencia de diseño y posponer la integración de los componentes ejecutables.
+\paragraph{XiYan-SQL~\cite{XiYan-SQL2024}.} Sistema multi-generador de \emph{text-to-SQL}, del cual se reutiliza, en primera instancia, la representación \textbf{M-Schema}: un formato semi-estructurado del esquema relacional que combina nombres, tipos, claves primarias, claves foráneas y muestras de valores en un bloque presentable directamente al \ac{LLM}. M-Schema es una de las representaciones de esquema más adoptadas en la literatura reciente, y constituye el punto de partida natural para extender el formato a esquemas duales. El propio repositorio público de XiYan-SQL es un meta-repositorio que enlaza a los componentes ejecutables (modelos \texttt{XiYanSQL-QwenCoder}, marco de entrenamiento, servidores MCP); este hecho, descubierto durante la fase de integración, condicionó la decisión de incorporar XiYan-SQL primero como referencia de diseño y posponer la integración de los componentes ejecutables. % LLM-like: cliché-LLM:"constituye"
 
 \paragraph{CHESS~\cite{CHESS2024}.} Sistema modular con razonamiento contextual y verificación basada en ejecución. Se utiliza como \emph{baseline} arquitectónico comparativo y como fuente conceptual de dos mecanismos: (a) la recuperación de valores de la base de datos mediante búsqueda por similitud aproximada, que se adapta para recuperar también valores asociados a propiedades de vértices y aristas del grafo de propiedad; y (b) un esquema de verificación dinámica con retroalimentación al generador, que se reformula en esta tesis bajo el principio de mediación obligatoria por representación intermedia (P2, Sección~\ref{sec:prop-requisitos}).
 
@@ -31,9 +31,9 @@ A continuación se describe cada base, con la razón específica que motiva su e
 
 \paragraph{DuckDB con la extensión DuckPGQ~\cite{DuckPGQ}.} DuckDB es un motor relacional empotrado de propósito analítico; la extensión DuckPGQ implementa la sub-cláusula \texttt{GRAPH\_TABLE(\ldots\ MATCH \ldots\ COLUMNS (\ldots))} del estándar \ac{SQL}/\ac{PGQ} compilándola internamente a operadores relacionales. Esta combinación es, en el momento de redacción, la única implementación abierta que ejecuta \ac{SQL}/\ac{PGQ} estandarizado de forma directa, con persistencia nativa de los grafos de propiedad. Se elige por satisfacer la condición de ``ejecutabilidad validable sobre el estándar'', sin la cual la verificación dinámica operaría sobre una aproximación.
 
-\paragraph{NL2SQL360~\cite{SuperSQL2024}.} Marco de evaluación revisado por pares para sistemas \emph{text-to-SQL} sobre los \emph{benchmarks} \textsc{Spider} y \textsc{BIRD}. Se incorpora sin modificaciones para producir las métricas canónicas (\emph{Execution Accuracy}, \emph{Exact Match}, \emph{Valid Efficiency Score}) en el régimen relacional puro. 
+\paragraph{NL2SQL360~\cite{SuperSQL2024}.} Marco de evaluación revisado por pares para sistemas \emph{text-to-SQL} sobre los \emph{benchmarks} \textsc{Spider} y \textsc{BIRD}. Se incorpora sin modificaciones para producir las métricas canónicas (\emph{Execution Accuracy}, \emph{Exact Match}, \emph{Valid Efficiency Score}) en el régimen relacional puro.
 
-%Para el régimen híbrido \ac{SQL}/\ac{PGQ}, NL2SQL360 no aplica directamente; se complementa con un módulo de métricas propio descrito en la Sección~\ref{sec:prop-implementacion}.
+\paragraph{Text2GQL-Bench~\cite{text2gqlbench}.} \emph{Benchmark} multi-lenguaje para \emph{text-to-graph-query} con 178\,184 pares pregunta--consulta sobre 13 dominios, evaluados con ejecución verificada en TuGraph-DB (Cypher) y Spanner Graph (ISO-GQL). Se incorpora con un doble papel. Primero, sus particiones ejecutables en Cypher e ISO-GQL se utilizan para evaluar el bloque de grafo de IR-SQL/PGQ contra sistemas \emph{text-to-Cypher}/\emph{text-to-GQL} existentes, en condiciones equivalentes a las del estado del arte sobre el régimen de grafo puro. Segundo, su metodología de construcción de \emph{benchmark} ---traducción de esquemas, conversión de datos, traducción de consultas y generación jerárquica de preguntas--- se adopta como referencia para construir el corpus propio del régimen híbrido \ac{SQL}/\ac{PGQ}, que se documenta en la Sección~\ref{sec:prop-resultados-esperados}. La elección responde a una observación operativa: no existe \emph{benchmark} público que cubra el régimen híbrido \ac{SQL}/\ac{PGQ}, por lo que la legitimidad metodológica del corpus propio se sostiene en el alineamiento con el procedimiento de un \emph{benchmark} ya revisado por pares para el caso de grafo puro.
 
 \paragraph{sqlglot.}
 % TODO: agregar entrada BibTeX para sqlglot (Tobias Mao, https://github.com/tobymao/sqlglot)
@@ -55,7 +55,7 @@ La Figura~\ref{fig:prop-bases} resume las bases seleccionadas y la dimensión de
 \section{Requisitos y principios de diseño}
 \label{sec:prop-requisitos}
 
-Los requisitos que se formulan en esta sección no constituyen una enumeración
+Los requisitos que se formulan en esta sección no constituyen una enumeración % LLM-like: cliché-LLM:"constituyen"
 arbitraria, sino la traducción operacional de tres insumos previos del
 documento: (i) el planteamiento del problema desarrollado en el
 Capítulo~\ref{chap:introduction}, (ii) los fundamentos conceptuales revisados
@@ -103,7 +103,7 @@ alcance al dominio híbrido.
 \paragraph{R5. Modularidad y agnosticismo respecto del \ac{LLM}.} Los
 componentes de generación deben acoplarse al \ac{LLM} mediante una interfaz
 abstracta que permita sustituir el modelo subyacente sin modificar la
-arquitectura general. Este requisito responde a la observación empírica de que
+arquitectura general. Este requisito responde a la observación empírica de que % LLM-like: cliché-LLM:"observación empírica"
 los resultados reportados en el estado del arte dependen de manera crítica del
 \ac{LLM} utilizado, fenómeno documentado por
 SuperSQL~\cite{SuperSQL2024} y por la proliferación de enfoques que combinan
@@ -112,7 +112,7 @@ múltiples generadores~\cite{CHASE-SQL2025, XiYan-SQL2024}.
 \paragraph{R6. Trazabilidad de decisiones intermedias.} Cada consulta
 generada debe poder rastrearse a lo largo de sus etapas intermedias:
 interpretación del lenguaje natural, construcción de la \ac{RI}, compilación y
-verificación. La trazabilidad constituye un requisito previo para la
+verificación. La trazabilidad constituye un requisito previo para la % LLM-like: cliché-LLM:"constituye"
 interpretabilidad en entornos empresariales, una propiedad que el estado del
 arte actual aborda solo de manera marginal~\cite{Data2Decisions, NLinterfaces}.
 
@@ -132,7 +132,7 @@ debe operar bajo un presupuesto explícito de invocaciones al \ac{LLM}, tokens
 consumidos y latencia agregada. El bucle de refinamiento debe incorporar un
 criterio de terminación que limite el número máximo de iteraciones, de modo
 que el coste agregado por consulta sea predecible y comparable con el de los
-sistemas del estado del arte. Este requisito materializa la observación de
+sistemas del estado del arte. Este requisito materializa la observación de % LLM-like: cliché-LLM:"materializa"
 que la adopción empresarial de interfaces en lenguaje natural depende tanto
 de la corrección como del coste por consulta sostenido a escala.
 
@@ -147,7 +147,7 @@ diseño} que orientan las decisiones arquitectónicas concretas de la propuesta.
 
     \item[P2. Mediación obligatoria por representación intermedia.] Ningún
     artefacto sintáctico de consulta alcanza el motor de ejecución sin pasar
-    por la \ac{RI} tipada. La \ac{RI} constituye la frontera formal entre el
+    por la \ac{RI} tipada. La \ac{RI} constituye la frontera formal entre el % LLM-like: cliché-LLM:"constituye"
     componente estadístico y el componente determinista; la traducción desde
     la \ac{RI} hacia \ac{SQL}/\ac{PGQ} es una función determinista, sin
     intervención adicional del modelo.
@@ -169,12 +169,12 @@ diseño} que orientan las decisiones arquitectónicas concretas de la propuesta.
     arquitectónica queda atada a un modelo específico.
 \end{description}
 
-Estos principios se concretan en el \emph{pipeline} descrito a continuación.
+Estos principios se concretan en el \emph{pipeline} descrito a continuación. % LLM-like: cliché-LLM:"se concretan en"
 
 \section{Flujo metodológico general}
 \label{sec:prop-pipeline}
 
-El \emph{pipeline} propuesto se articula en cinco etapas secuenciales, junto
+El \emph{pipeline} propuesto se articula en cinco etapas secuenciales, junto % LLM-like: cliché-LLM:"articula"
 con un bucle de refinamiento asimétrico entre la construcción de la
 \ac{RI} y la fase de verificación. La
 Figura~\ref{fig:pipeline-general} resume el flujo metodológico general de la
@@ -197,7 +197,7 @@ propuesta.
     esquema proyectado, es decir, un subconjunto del esquema dual enriquecido
     con señales de relevancia, tales como tablas y columnas candidatas,
     vértices y aristas potencialmente implicados, así como \emph{cell-values}
-    relevantes. Esta fase materializa el principio P1 y se apoya en ideas de
+    relevantes. Esta fase materializa el principio P1 y se apoya en ideas de % LLM-like: cliché-LLM:"materializa"
     anclaje al esquema y reducción del espacio de búsqueda reportadas en
     \cite{RSL-SQL2024, CHESS2024}.
 
@@ -213,7 +213,7 @@ propuesta.
 
     \item \textbf{Construcción de la representación intermedia tipada.} Con
     base en la interpretación estructurada, se construye una instancia de la
-    \ac{RI} propuesta. Esta etapa constituye el núcleo conceptual de la
+    \ac{RI} propuesta. Esta etapa constituye el núcleo conceptual de la % LLM-like: cliché-LLM:"constituye"
     arquitectura, pues traduce la intención del usuario a una forma
     estructurada, tipada y validable antes de cualquier compilación al
     lenguaje de consulta final.
@@ -236,14 +236,14 @@ propuesta.
 
 El bucle de refinamiento es asimétrico en el sentido que la
 retroalimentación no modifica la pregunta original ni reabre la interpretación
-de alto nivel de la etapa dos, sino que actúa exclusivamente sobre la
+de alto nivel de la etapa dos, sino que actúa exclusivamente sobre la % LLM-like: maximizador:"exclusivamente"
 construcción de la \ac{RI}. Esta decisión responde al principio P2, ya que
 concentra la corrección en el espacio donde la estructura puede manipularse de
 forma explícita y verificable mediante reglas. El refinamiento concluye cuando
 se satisface alguno de los siguientes criterios: (i) la verificación es
 superada, (ii) se alcanza un número máximo de iteraciones, o (iii) el sistema
 determina que la pregunta presenta una ambigüedad intrínseca que requiere
-clarificación del usuario, en consonancia con lo planteado por
+clarificación del usuario, en consonancia con lo planteado por % LLM-like: cliché-LLM:"en consonancia con"
 \cite{AmbiSQL}.
 
 
@@ -251,7 +251,7 @@ clarificación del usuario, en consonancia con lo planteado por
 \section{Arquitectura y componentes}
 \label{sec:prop-arquitectura}
 
-Esta sección detalla los cuatro componentes arquitectónicos que materializan el \emph{pipeline}: el anclaje al esquema dual (\S\ref{subsec:prop-anclaje}), la \ac{RI} tipada IR-SQL/PGQ (\S\ref{subsec:prop-ri}), el compilador determinista (\S\ref{subsec:prop-compilador}) y el bucle de verificación (\S\ref{subsec:prop-verificacion}).
+Esta sección detalla los cuatro componentes arquitectónicos que materializan el \emph{pipeline}: el anclaje al esquema dual (\S\ref{subsec:prop-anclaje}), la \ac{RI} tipada IR-SQL/PGQ (\S\ref{subsec:prop-ri}), el compilador determinista (\S\ref{subsec:prop-compilador}) y el bucle de verificación (\S\ref{subsec:prop-verificacion}). % LLM-like: cliché-LLM:"materializan"
 
 \subsection{Anclaje al esquema dual}
 \label{subsec:prop-anclaje}
@@ -275,7 +275,7 @@ El esquema proyectado es el único contexto estructural que las etapas posterior
 \subsection{Representación intermedia tipada (IR-SQL/PGQ)}
 \label{subsec:prop-ri}
 
-La \ac{RI} propuesta, denominada \textbf{IR-SQL/PGQ}, es la pieza central de la arquitectura. Su valor es triple. Constituye el contrato fijo entre el modelo de lenguaje y el resto del \emph{pipeline}, ya que el modelo no produce \ac{SQL}/\ac{PGQ} libre sino una instancia de \ac{RI} cuya estructura está validada al momento de la generación. Es la única estructura sobre la cual el verificador estático opera, sin necesidad de parsear \ac{SQL} ni de inferir desde un árbol de sintaxis abstracta del motor. Es la entrada del compilador determinista que materializa la consulta concreta, con la garantía formal de que dos instancias estructuralmente idénticas de la \ac{RI} producen el mismo \ac{SQL} textual.
+La \ac{RI} propuesta, denominada \textbf{IR-SQL/PGQ}, es la pieza central de la arquitectura. Su valor es triple. Constituye el contrato fijo entre el modelo de lenguaje y el resto del \emph{pipeline}, ya que el modelo no produce \ac{SQL}/\ac{PGQ} libre sino una instancia de \ac{RI} cuya estructura está validada al momento de la generación. Es la única estructura sobre la cual el verificador estático opera, sin necesidad de parsear \ac{SQL} ni de inferir desde un árbol de sintaxis abstracta del motor. Es la entrada del compilador determinista que materializa la consulta concreta, con la garantía formal de que dos instancias estructuralmente idénticas de la \ac{RI} producen el mismo \ac{SQL} textual. % LLM-like: cliché-LLM:"pieza central"; cliché-LLM:"materializa"; cliché-LLM:"Constituye"
 
 \paragraph{Posicionamiento respecto a representaciones intermedias previas.} IR-SQL/PGQ se sitúa en el linaje de las representaciones intermedias tipadas para \emph{text-to-SQL} y hereda principios de tres familias del estado del arte. De \textsc{SemQL}~\cite{guo2019irnet} hereda la idea de descomponer la generación en una secuencia de decisiones tipadas sobre un esqueleto, donde cada acción expande un componente con un tipo predefinido. De \textsc{NatSQL}~\cite{gan2021natsql} hereda el principio de colapsar varios constructos del lenguaje en operaciones equivalentes pero más uniformes, lo que reduce la superficie de decisión del modelo. De los \emph{skeletons} de \textsc{RESDSQL}~\cite{RESDSQL2023} hereda la disciplina operativa de mantener un compilador determinista descendiente de la \ac{RI} a la consulta textual. La novedad declarada de IR-SQL/PGQ frente a estas tres familias es doble: el tratamiento uniforme de bloques de grafo (\texttt{MatchPattern}, \texttt{PathPattern}, \texttt{VertexPattern}, \texttt{EdgePattern}) que permite expresar consultas \ac{SQL}/\ac{PGQ} con la misma economía sintáctica con la que SemQL expresa consultas relacionales; y la composicionalidad híbrida (\texttt{FromGraphMatch}), que permite que el resultado de una consulta de grafo participe como tabla derivada en el contexto relacional sin requerir nodos especiales para el caso mixto.
 
@@ -287,19 +287,19 @@ La \ac{RI} se organiza en tres bloques: el bloque relacional, el bloque de grafo
 
 La cobertura empírica del bloque relacional, medida sobre las cien consultas predichas por el modelo de lenguaje en el experimento de \emph{baseline} sobre \textsc{Spider} \emph{dev}, alcanza el noventa y nueve por ciento de \emph{round-trip} estructural exacto; el caso restante corresponde a una \emph{window function}, construcción que la \ac{RI} todavía no representa y que está documentada como extensión natural pendiente.
 
-\paragraph{Bloque de grafo.} Materializa la cláusula \texttt{GRAPH\_TABLE(\ldots\ MATCH \ldots\ COLUMNS (\ldots))} del estándar \ac{SQL}/\ac{PGQ}~\cite{ISO9075_16_2023, DuckPGQ}. Consta de cuatro nodos. \texttt{VertexPattern} representa un patrón de vértice con su variable de enlace y su etiqueta de tipo. \texttt{EdgePattern} representa un patrón de arista con su variable, etiqueta y dirección, esta última admitiendo tres valores literales (forward, backward o no dirigida) que invierten o relajan los roles de \emph{source} y \emph{destination} declarados por la arista en el catálogo del grafo. \texttt{PathPattern} agrupa un vértice cabecera y una secuencia ordenada de pasos arista-vértice, lo que permite expresar caminos \emph{multihop}. \texttt{MatchPattern} es la raíz del bloque y agrupa un identificador del \emph{property graph} consultado, una colección de patrones de camino, una cláusula \texttt{WHERE} interna sobre las variables del MATCH, y una colección de \texttt{SelectItem} en la cláusula \texttt{COLUMNS} que define las columnas que el bloque expone hacia afuera. La superficie expuesta por \texttt{COLUMNS} es la única vía por la que las variables del MATCH se proyectan al contexto exterior; el resto permanece encapsulado.
+\paragraph{Bloque de grafo.} Materializa la cláusula \texttt{GRAPH\_TABLE(\ldots\ MATCH \ldots\ COLUMNS (\ldots))} del estándar \ac{SQL}/\ac{PGQ}~\cite{ISO9075_16_2023, DuckPGQ}. Consta de cuatro nodos. \texttt{VertexPattern} representa un patrón de vértice con su variable de enlace y su etiqueta de tipo. \texttt{EdgePattern} representa un patrón de arista con su variable, etiqueta y dirección, esta última admitiendo tres valores literales (forward, backward o no dirigida) que invierten o relajan los roles de \emph{source} y \emph{destination} declarados por la arista en el catálogo del grafo. \texttt{PathPattern} agrupa un vértice cabecera y una secuencia ordenada de pasos arista-vértice, lo que permite expresar caminos \emph{multihop}. \texttt{MatchPattern} es la raíz del bloque y agrupa un identificador del \emph{property graph} consultado, una colección de patrones de camino, una cláusula \texttt{WHERE} interna sobre las variables del MATCH, y una colección de \texttt{SelectItem} en la cláusula \texttt{COLUMNS} que define las columnas que el bloque expone hacia afuera. La superficie expuesta por \texttt{COLUMNS} es la única vía por la que las variables del MATCH se proyectan al contexto exterior; el resto permanece encapsulado. % LLM-like: cliché-LLM:"Materializa"
 
-\paragraph{Composición híbrida.} El nodo \texttt{FromGraphMatch} materializa la unión entre los bloques relacional y de grafo. Como elemento de la unión \texttt{FromExpr}, puede ocupar cualquier posición que un \texttt{FromTable} ocuparía: ser la única fuente de un \texttt{RelationalQuery} (caso de consulta puramente de grafo), ser un operando de un \texttt{Join} con una tabla relacional (caso híbrido canónico, donde el resultado del MATCH se mezcla con datos relacionales mediante \texttt{JOIN \ldots\ ON}), o ser un operando de otro \texttt{Join} anidado. La composicionalidad es estructural: no hay nodos especiales para el caso híbrido, y todas las operaciones del bloque relacional (filtros, agrupaciones, ordenamientos, agregaciones, \emph{set operations}) siguen siendo expresables uniformemente sobre el resultado del MATCH.
+\paragraph{Composición híbrida.} El nodo \texttt{FromGraphMatch} materializa la unión entre los bloques relacional y de grafo. Como elemento de la unión \texttt{FromExpr}, puede ocupar cualquier posición que un \texttt{FromTable} ocuparía: ser la única fuente de un \texttt{RelationalQuery} (caso de consulta puramente de grafo), ser un operando de un \texttt{Join} con una tabla relacional (caso híbrido canónico, donde el resultado del MATCH se mezcla con datos relacionales mediante \texttt{JOIN \ldots\ ON}), o ser un operando de otro \texttt{Join} anidado. La composicionalidad es estructural: no hay nodos especiales para el caso híbrido, y todas las operaciones del bloque relacional (filtros, agrupaciones, ordenamientos, agregaciones, \emph{set operations}) siguen siendo expresables uniformemente sobre el resultado del MATCH. % LLM-like: cliché-LLM:"materializa"
 
 Esta uniformidad es el punto donde la \ac{RI} difiere de las representaciones previas, todas concebidas para \ac{SQL} relacional puro: los esquemas como \textsc{SemQL} y \textsc{NatSQL} no contemplan bloques de grafo y los \emph{skeletons} de \textsc{RESDSQL} no admiten la heterogeneidad sintáctica entre las cláusulas que la composición híbrida exige.
 
 El alias del \texttt{FromGraphMatch} cumple un rol específico en la verificación. Las variables internas del MATCH no se propagan al \emph{scope} del \texttt{RelationalQuery} contenedor; lo que sí se propaga son las columnas declaradas en \texttt{MatchPattern.columns}, accesibles desde el contexto exterior mediante la sintaxis \texttt{<alias>.<columna>}. El verificador estático mantiene tres ámbitos separados (aliases de tablas relacionales, aliases de bloques de grafo, variables de vértice del MATCH) para resolver correctamente cada calificador a su origen. Esta separación de ámbitos, no presente en la verificación de \emph{text-to-SQL} clásica, es necesaria para evitar tanto falsos positivos al rechazar referencias válidas como falsos negativos al admitir referencias que escapan del MATCH.
 
-\paragraph{Esquema proyectado y catálogo de grafo.} El verificador y el compilador consumen el esquema proyectado $\Sigma_{\mathrm{proj}}$ definido en la Sección~\ref{subsec:prop-anclaje} junto con un catálogo del grafo de propiedad que declara, para cada \emph{label} de vértice, la tabla relacional asociada y las columnas clave, y para cada \emph{label} de arista, las tablas y los \emph{labels} de \emph{source} y \emph{destination} con sus respectivas claves. Esta declaración corresponde directamente a la cláusula \texttt{CREATE PROPERTY GRAPH \ldots\ VERTEX TABLES (\ldots) EDGE TABLES (\ldots)} del estándar~\cite{ISO9075_16_2023, DuckPGQ}. La unión del esquema relacional, el catálogo de grafos de propiedad y los valores recuperados constituye el único contexto estructural que el verificador consume; la \ac{RI} se valida exclusivamente contra ese contexto, sin que el verificador inspeccione la base de datos directamente.
+\paragraph{Esquema proyectado y catálogo de grafo.} El verificador y el compilador consumen el esquema proyectado $\Sigma_{\mathrm{proj}}$ definido en la Sección~\ref{subsec:prop-anclaje} junto con un catálogo del grafo de propiedad que declara, para cada \emph{label} de vértice, la tabla relacional asociada y las columnas clave, y para cada \emph{label} de arista, las tablas y los \emph{labels} de \emph{source} y \emph{destination} con sus respectivas claves. Esta declaración corresponde directamente a la cláusula \texttt{CREATE PROPERTY GRAPH \ldots\ VERTEX TABLES (\ldots) EDGE TABLES (\ldots)} del estándar~\cite{ISO9075_16_2023, DuckPGQ}. La unión del esquema relacional, el catálogo de grafos de propiedad y los valores recuperados constituye el único contexto estructural que el verificador consume; la \ac{RI} se valida exclusivamente contra ese contexto, sin que el verificador inspeccione la base de datos directamente. % LLM-like: maximizador:"exclusivamente"; cliché-LLM:"constituye"
 
-\paragraph{Contrato JSON con el modelo de lenguaje.} La \ac{RI} tiene un contrato bidireccional con un formato JSON plano que materializa el principio P2 (mediación obligatoria). Cada nodo se representa como un objeto JSON con un campo \texttt{type} cuyo valor es el nombre exacto de la \emph{dataclass}; las uniones discriminadas (\texttt{Query}, \texttt{Expression}, \texttt{FromExpr}) resuelven por ese campo. El JSON Schema correspondiente se construye en formato \emph{draft 2020-12}\footnote{JSON Schema, especificación draft 2020-12, \url{https://json-schema.org/draft/2020-12}. Cita canónica pendiente de incorporar al BibTeX.} y se utiliza como \texttt{input\_schema} de una \emph{tool} en la \ac{API} del modelo de lenguaje, lo que fuerza una salida estructurada y delega la primera validación a la \ac{SDK} antes de que el \emph{payload} alcance el \emph{pipeline}.
+\paragraph{Contrato JSON con el modelo de lenguaje.} La \ac{RI} tiene un contrato bidireccional con un formato JSON plano que materializa el principio P2 (mediación obligatoria). Cada nodo se representa como un objeto JSON con un campo \texttt{type} cuyo valor es el nombre exacto de la \emph{dataclass}; las uniones discriminadas (\texttt{Query}, \texttt{Expression}, \texttt{FromExpr}) resuelven por ese campo. El JSON Schema correspondiente se construye en formato \emph{draft 2020-12}\footnote{JSON Schema, especificación draft 2020-12, \url{https://json-schema.org/draft/2020-12}. Cita canónica pendiente de incorporar al BibTeX.} y se utiliza como \texttt{input\_schema} de una \emph{tool} en la \ac{API} del modelo de lenguaje, lo que fuerza una salida estructurada y delega la primera validación a la \ac{SDK} antes de que el \emph{payload} alcance el \emph{pipeline}. % LLM-like: cliché-LLM:"materializa"
 
-El contrato JSON es lo que materializa la propiedad de cierre estructural promovida por el principio P2: el modelo no puede emitir \ac{SQL}/\ac{PGQ} libre porque la única salida válida del \emph{tool} es un objeto \ac{RI}; el \emph{schema} valida la forma; el \emph{parser} valida la coherencia con las \emph{dataclasses}; el verificador estático valida la coherencia con el esquema proyectado. Cuatro guardas en serie reducen el universo de fallos posibles a errores semánticos no detectables por análisis estático, que quedan para el régimen de verificación dinámica (Sección~\ref{subsec:prop-verificacion}). Este encadenamiento de guardas es lo que distingue la propuesta de los enfoques de auto-corrección puros del estado del arte, donde el modelo emite \ac{SQL} textual y la corrección se aplica \emph{ex post} sobre la salida; aquí, en cambio, la corrección se aplica \emph{ex ante} sobre la \ac{RI}, antes de que cualquier \ac{SQL} textual exista.
+El contrato JSON es lo que materializa la propiedad de cierre estructural promovida por el principio P2: el modelo no puede emitir \ac{SQL}/\ac{PGQ} libre porque la única salida válida del \emph{tool} es un objeto \ac{RI}; el \emph{schema} valida la forma; el \emph{parser} valida la coherencia con las \emph{dataclasses}; el verificador estático valida la coherencia con el esquema proyectado. Cuatro guardas en serie reducen el universo de fallos posibles a errores semánticos no detectables por análisis estático, que quedan para el régimen de verificación dinámica (Sección~\ref{subsec:prop-verificacion}). Este encadenamiento de guardas es lo que distingue la propuesta de los enfoques de auto-corrección puros del estado del arte, donde el modelo emite \ac{SQL} textual y la corrección se aplica \emph{ex post} sobre la salida; aquí, en cambio, la corrección se aplica \emph{ex ante} sobre la \ac{RI}, antes de que cualquier \ac{SQL} textual exista. % LLM-like: cliché-LLM:"materializa"
 
 \paragraph{Invariantes operativos.} Cuatro invariantes sostienen el comportamiento del sistema y son los que las pruebas y los experimentos validan empíricamente.
 
@@ -318,7 +318,7 @@ La cuarta invariante es la \emph{soundness referencial}: si una \ac{RI} pasa el 
 El compilador transforma una instancia válida de IR-SQL/PGQ en una consulta concreta en dialecto \ac{SQL}/\ac{PGQ}. La operación es determinista en sentido estricto: dos instancias estructuralmente idénticas de la \ac{RI} producen la misma consulta compilada, independientemente de estados externos o de llamadas al \ac{LLM}.
 
 La compilación procede por recorrido ascendente del árbol. Los bloques relacionales se traducen a \ac{SQL} estándar siguiendo reglas análogas a las de \textsc{NatSQL}~\cite{gan2021natsql}.
-Los bloques de grafo se traducen a la cláusula \texttt{FROM GRAPH\_TABLE(\ldots\ MATCH \ldots\ COLUMNS (\ldots))} del estándar~\cite{DuckPGQ}; los bloques híbridos se materializan como subconsultas donde el resultado de \texttt{GRAPH\_TABLE} participa como tabla derivada en el contexto relacional. Una restricción operativa heredada del motor merece mención: en la versión actual de DuckPGQ, los patrones \texttt{MATCH} exigen una variable explícita en cada arista (por ejemplo, \texttt{(a:Person)-[k:knows]->(b:Person)} en lugar de \texttt{(a:Person)-[:knows]->(b:Person)}); el compilador genera dicha variable de forma sistemática aunque no se utilice posteriormente, decisión documentada en el registro técnico del prototipo.
+Los bloques de grafo se traducen a la cláusula \texttt{FROM GRAPH\_TABLE(\ldots\ MATCH \ldots\ COLUMNS (\ldots))} del estándar~\cite{DuckPGQ}; los bloques híbridos se materializan como subconsultas donde el resultado de \texttt{GRAPH\_TABLE} participa como tabla derivada en el contexto relacional. Una restricción operativa heredada del motor merece mención: en la versión actual de DuckPGQ, los patrones \texttt{MATCH} exigen una variable explícita en cada arista (por ejemplo, \texttt{(a:Person)-[k:knows]->(b:Person)} en lugar de \texttt{(a:Person)-[:knows]->(b:Person)}); el compilador genera dicha variable de forma sistemática aunque no se utilice posteriormente, decisión documentada en el registro técnico del prototipo. Esta y otras restricciones específicas del motor se aíslan en una bandera de configuración del compilador (\texttt{emit-edge-variables}), de modo que su desactivación frente a otro motor del estándar no exige modificación de la lógica de compilación, en consonancia con el requisito R7 enunciado en la Sección~\ref{sec:prop-requisitos}. % LLM-like: cliché-LLM:"en consonancia con"; cliché-LLM:"materializan"
 
 El compilador no realiza optimización. La consulta producida puede no ser la más eficiente posible, pero es válida por construcción respecto al estándar y al esquema. La optimización se delega al motor de ejecución (DuckDB con la extensión DuckPGQ), siguiendo el principio de separación de responsabilidades.
 
@@ -334,14 +334,14 @@ La verificación se organiza en dos regímenes encadenados, conforme al principi
 
     \item[Familia de consistencia de tipos.] Los operadores se aplican únicamente sobre operandos cuyos tipos los admiten. La verificación cubre dos casos canónicos: una agregación \texttt{AVG} o \texttt{SUM} no se aplica sobre una columna de tipo no numérico (descriptor \texttt{type\_mismatch\_aggregate}), y una operación aritmética binaria requiere operandos numéricos en ambos lados (\texttt{type\_mismatch\_arithmetic}). La inferencia opera por categoría abstracta (numérica, textual, fecha, booleana) derivada del tipo declarado en el esquema, con tratamiento permisivo de tipos no resueltos para evitar falsos positivos.
 
-    \item[Familia de coherencia cruzada relacional--grafo.] En bloques híbridos se verifica que los \emph{labels} de vértice referenciados tengan una tabla relacional asociada según la declaración del grafo de propiedad (descriptor \texttt{vertex\_label\_without\_table}). Adicionalmente, en \texttt{PathPattern} \emph{multihop} se verifica que el \emph{label} del vértice precedente coincida con el \emph{source label} declarado por la arista, y análogamente para el destino, contemplando las tres direcciones admitidas (\texttt{path\_step\_incoherent}). Esta segunda verificación es una extensión natural de la primera que se incorpora a partir de la observación empírica de un modo de fallo en el cual el modelo construye cadenas \emph{multihop} sintácticamente correctas pero semánticamente incoherentes con la declaración del grafo de propiedad.
+    \item[Familia de coherencia cruzada relacional--grafo.] En bloques híbridos se verifica que los \emph{labels} de vértice referenciados tengan una tabla relacional asociada según la declaración del grafo de propiedad (descriptor \texttt{vertex\_label\_without\_table}). Adicionalmente, en \texttt{PathPattern} \emph{multihop} se verifica que el \emph{label} del vértice precedente coincida con el \emph{source label} declarado por la arista, y análogamente para el destino, contemplando las tres direcciones admitidas (\texttt{path\_step\_incoherent}). Esta segunda verificación es una extensión natural de la primera que se incorpora a partir de la observación empírica de un modo de fallo en el cual el modelo construye cadenas \emph{multihop} sintácticamente correctas pero semánticamente incoherentes con la declaración del grafo de propiedad. % LLM-like: cliché-LLM:"observación empírica"
 
-    \item[Familia de restricciones operativas del motor.] Una clase adicional de chequeo, separada conceptualmente del diseño abstracto de la \ac{RI}, refleja una restricción operativa de DuckPGQ~\cite{DuckPGQ}: cada \texttt{VertexPattern} debe declarar \emph{label} aunque el estándar lo permita ausente (descriptor \texttt{missing\_vertex\_label}). El verificador detecta esta condición antes de la compilación y emite el descriptor canónico correspondiente, lo que evita que la consulta llegue al motor y falle con un mensaje opaco.
+    \item[Familia de restricciones operativas del motor.] Una clase adicional de chequeo, separada conceptualmente del diseño abstracto de la \ac{RI}, refleja una restricción operativa de DuckPGQ~\cite{DuckPGQ}: cada \texttt{VertexPattern} debe declarar \emph{label} aunque el estándar lo permita ausente (descriptor \texttt{missing\_vertex\_label}). El verificador detecta esta condición antes de la compilación y emite el descriptor canónico correspondiente, lo que evita que la consulta llegue al motor y falle con un mensaje opaco. Cada chequeo de esta familia se gobierna mediante una bandera de configuración independiente, lo que permite habilitarlo o desactivarlo según el motor objetivo sin modificar las tres familias anteriores; esta separación operativa concreta el principio de portabilidad enunciado en R7 (Sección~\ref{sec:prop-requisitos}).
 \end{description}
 
 La verificación estática conecta con la tradición de la decodificación restringida inaugurada por \textsc{PICARD}~\cite{PICARD2022}, pero opera a un nivel de abstracción superior en lugar de sobre \emph{tokens}. La política de errores acumula todos los hallazgos antes de devolver, en lugar de cortar al primer fallo: el bucle de retroalimentación recibe así un reporte completo por consulta y puede decidir si re-prompts, repara una porción de la \ac{RI} o reformula la pregunta.
 
-\paragraph{Verificación dinámica.} Si la verificación estática se supera, la consulta se ejecuta sobre una instancia de DuckDB con la extensión DuckPGQ cargada~\cite{DuckPGQ}. El motor actúa como \emph{oráculo parcial}: clasifica la consulta como válida, inválida por error de ejecución, o ejecutable pero con salida atípica (cardinalidad cero, presencia inesperada de valores nulos). Los errores y las salidas atípicas generan señales que retroalimentan la construcción de la \ac{RI}, en línea con la estrategia \emph{execution-guided} documentada en \cite{CHESS2024, TS-SQL2025, SQLHD2025}.
+\paragraph{Verificación dinámica.} Si la verificación estática se supera, la consulta se ejecuta sobre una instancia de DuckDB con la extensión DuckPGQ cargada~\cite{DuckPGQ}. El motor actúa como \emph{oráculo parcial}: clasifica la consulta como válida, inválida por error de ejecución, o ejecutable pero con salida atípica (cardinalidad cero, presencia inesperada de valores nulos). Los errores y las salidas atípicas generan señales que retroalimentan la construcción de la \ac{RI}, en línea con la estrategia \emph{execution-guided} documentada en \cite{CHESS2024, TS-SQL2025, SQLHD2025}. % LLM-like: cliché-LLM:"en línea con"
 
 \paragraph{Taxonomía operativa de alucinaciones.}\label{subsec:alucinaciones}
 La conjunción de los regímenes estático y dinámico define una taxonomía operativa de las alucinaciones que el sistema puede detectar y, en consecuencia, retroalimentar al generador. La taxonomía organiza los descriptores canónicos del verificador en tres niveles, en orden creciente de coste de detección.
@@ -380,7 +380,7 @@ El prototipo se ejecuta sobre el siguiente stack, fijado para satisfacer el requ
 \section{Resultados esperados}
 \label{sec:prop-resultados-esperados}
 
-La naturaleza incremental de la propuesta exige separar de forma explícita los resultados que se esperan al cierre del semestre académico en curso de los que constituyen la entrega final de la tesis. Cada conjunto se enuncia en términos verificables ---artefactos, evidencia experimental y documentos--- y se acompaña de criterios de éxito y limitaciones reconocidas, en consonancia con la transparencia metodológica que ha orientado el resto del capítulo. Los plazos siguen el cronograma de actividades de la tesis (Cuadro~\ref{tab:cronograma}).
+La naturaleza incremental de la propuesta exige separar de forma explícita los resultados que se esperan al cierre del semestre académico en curso de los que constituyen la entrega final de la tesis. Cada conjunto se enuncia en términos verificables ---artefactos, evidencia experimental y documentos--- y se acompaña de criterios de éxito y limitaciones reconocidas, en consonancia con la transparencia metodológica que ha orientado el resto del capítulo. Los plazos siguen el cronograma de actividades de la tesis (Cuadro~\ref{tab:cronograma}). % LLM-like: cliché-LLM:"en consonancia con"; cliché-LLM:"constituyen"
 
 \subsection{Resultados esperados al cierre del semestre 2026-1}
 \label{subsec:prop-resultados-sem1}
@@ -397,12 +397,13 @@ El cronograma sitúa el cierre del primer semestre académico en la \emph{Exposi
     \item Una primera versión del bucle de retroalimentación con descriptores categóricos, integrada con la verificación dinámica sobre DuckPGQ.
 \end{enumerate}
 
-\paragraph{Corpus piloto y evidencia experimental.} Se entregará un corpus piloto de evaluación, construido específicamente para el régimen \ac{SQL}/\ac{PGQ} y de tamaño suficiente para validar la mecánica del \emph{pipeline}, sin pretender aún la cobertura empírica que la entrega final exigirá. La evidencia experimental asociada incluirá:
+\paragraph{Corpus piloto y evidencia experimental.} Se entregará un corpus piloto de evaluación, construido específicamente para el régimen híbrido \ac{SQL}/\ac{PGQ} siguiendo la metodología de \textsc{Text2GQL-Bench}~\cite{text2gqlbench} ---traducción de esquemas, conversión de datos, traducción de consultas y generación jerárquica de preguntas--- adaptada al estándar ISO/IEC 9075-16:2023. Su tamaño en esta etapa busca validar la mecánica del \emph{pipeline}, sin pretender aún la cobertura empírica que la entrega final exigirá. La evidencia experimental asociada incluirá:
 
 \begin{enumerate}
     \item Un experimento ampliado sobre \textsc{Spider}, con un volumen de preguntas suficiente para que la tasa de detección del verificador estático refleje el comportamiento del modelo y no la ausencia de alucinaciones en muestras pequeñas.
     \item Un experimento inicial sobre el corpus piloto \ac{SQL}/\ac{PGQ}, que reporte tasas de validez sintáctica, validez referencial y ejecutabilidad sobre DuckPGQ. Las métricas se reportarán por separado para los regímenes relacional puro, de grafo puro e híbrido.
     \item Un análisis de errores por categoría (referenciales, estructurales, semánticas), siguiendo la tipología introducida en la Sección~\ref{subsec:alucinaciones}.
+    \item Un reporte preliminar del coste agregado por consulta sobre el corpus piloto, registrando como mínimo las invocaciones al \ac{LLM}, los \emph{tokens} consumidos, las iteraciones del bucle de refinamiento hasta convergencia y la latencia agregada de extremo a extremo. Este reporte responde al requisito R8 (Sección~\ref{sec:prop-requisitos}) y establece la línea base sobre la que se contrastará la entrega final.
 \end{enumerate}
 
 \paragraph{Documento.} El documento de tesis al cierre del semestre incluirá los Capítulos 1 a 4 consolidados, una primera versión del Capítulo~\ref{chap:experiments} con el diseño experimental, y resultados preliminares del experimento sobre \textsc{Spider} y del corpus piloto. La presentación de Avances acompañará al documento como soporte para la exposición ante el jurado.
@@ -417,18 +418,28 @@ El cronograma sitúa la sustentación final en la semana del 1 al 12 de diciembr
 \begin{enumerate}
     \item La especificación completa de IR-SQL/PGQ ---incluida la familia \texttt{HybridComposition} y el conjunto exhaustivo de reglas de tipado--- y el compilador determinista correspondiente, validado sobre todas las construcciones del corpus de evaluación.
     \item El bucle de verificación integrado en sus dos regímenes (estático y dinámico) con la política de retroalimentación estructurada operativa, capaz de iterar hasta el criterio de terminación definido en la Sección~\ref{sec:prop-pipeline}.
-    \item La interfaz abstracta de \ac{LLM} que materializa el principio P5, instanciada al menos sobre dos modelos distintos (Anthropic Claude Haiku 4.5 y un segundo modelo aún por fijar entre Claude Sonnet 4.6 y un modelo de la familia \texttt{XiYanSQL-QwenCoder}) para evidenciar la sustitución sin modificación arquitectónica.
+    \item La interfaz abstracta de \ac{LLM} que materializa el principio P5, instanciada al menos sobre dos modelos distintos (Anthropic Claude Haiku 4.5 y un segundo modelo aún por fijar entre Claude Sonnet 4.6 y un modelo de la familia \texttt{XiYanSQL-QwenCoder}) para evidenciar la sustitución sin modificación arquitectónica. % LLM-like: cliché-LLM:"materializa"
 \end{enumerate}
 
-\paragraph{Corpus \ac{SQL}/\ac{PGQ} de evaluación.} Se entregará un corpus de evaluación más amplio que el corpus piloto, construido con el procedimiento descrito en el Capítulo~\ref{chap:experiments}. El corpus incluirá consultas en los tres regímenes ---relacional puro, de grafo puro e híbrido---, con su esquema dual asociado y la consulta de referencia (\emph{gold}). La construcción se documentará de modo que un tercero pueda regenerarlo a partir de las mismas fuentes.
+\paragraph{Datasets de evaluación final.} La validación final cubrirá los tres regímenes mediante una estrategia de evaluación de tres capas:
+
+\begin{enumerate}
+    \item \textbf{Régimen relacional puro:} \textsc{Spider}~\cite{Spider2018}, \textsc{BIRD}~\cite{BIRD2023} y \textsc{Spider 2.0}~\cite{spider2_2025}, evaluados con \textsc{NL2SQL360}~\cite{SuperSQL2024} en condiciones equivalentes a las del estado del arte.
+    \item \textbf{Régimen de grafo puro:} las particiones ejecutables de \textsc{Text2GQL-Bench}~\cite{text2gqlbench} sobre Cypher (TuGraph-DB) y sobre ISO-GQL (Spanner Graph), que permiten contrastar el bloque de grafo de IR-SQL/PGQ contra sistemas \emph{text-to-Cypher} y \emph{text-to-GQL} canónicos.
+    \item \textbf{Régimen híbrido \ac{SQL}/\ac{PGQ}:} corpus propio derivado de la metodología de \textsc{Text2GQL-Bench} adaptada al estándar híbrido, con consultas que combinan operadores relacionales y patrones de grafo en una misma expresión. Se entregará con su esquema dual asociado y consulta de referencia (\emph{gold}); su construcción se documentará de modo que un tercero pueda regenerarlo a partir de las mismas fuentes.
+\end{enumerate}
+
+La justificación de esta estrategia es metodológica: para los regímenes con \emph{benchmark} público disponible, la evaluación se apoya en él; para el régimen híbrido, donde no existe \emph{benchmark} público al momento de redacción, el corpus propio se construye sobre un procedimiento ya revisado por pares para el caso de grafo puro, lo que limita el sesgo del autor en su construcción.
 
 \paragraph{Evidencia experimental consolidada.} La validación final reportará:
 
 \begin{enumerate}
-    \item \textbf{Métricas canónicas} sobre \textsc{Spider} y \textsc{BIRD} mediante \textsc{NL2SQL360}~\cite{SuperSQL2024}: \emph{Execution Accuracy}, \emph{Exact Match} y \emph{Valid Efficiency Score}, en condiciones comparables con los \emph{baselines} declarados en el Capítulo~\ref{chap:experiments}.
-    \item \textbf{Métricas propias del régimen híbrido} ---no cubiertas por \textsc{NL2SQL360}---, que evalúen la consistencia cruzada entre componentes relacional y de grafo, la cobertura de los patrones \texttt{GRAPH\_TABLE} y la robustez ante perturbaciones controladas del esquema dual.
+    \item \textbf{Métricas canónicas del régimen relacional} sobre \textsc{Spider} y \textsc{BIRD} mediante \textsc{NL2SQL360}~\cite{SuperSQL2024}: \emph{Execution Accuracy}, \emph{Exact Match} y \emph{Valid Efficiency Score}, en condiciones comparables con los \emph{baselines} declarados en el Capítulo~\ref{chap:experiments}.
+    \item \textbf{Métricas canónicas del régimen de grafo} sobre las particiones Cypher e ISO-GQL de \textsc{Text2GQL-Bench}~\cite{text2gqlbench}: \emph{execution accuracy} con verificación contra el motor (TuGraph-DB y Spanner Graph respectivamente), reportadas en condiciones equivalentes a las de los sistemas \emph{text-to-Cypher} y \emph{text-to-GQL} del estado del arte.
+    \item \textbf{Métricas propias del régimen híbrido} ---no cubiertas por los \emph{benchmarks} anteriores---, que evalúen la consistencia cruzada entre componentes relacional y de grafo, la cobertura de los patrones \texttt{GRAPH\_TABLE} y la robustez ante perturbaciones controladas del esquema dual.
+    \item \textbf{Coste de inferencia por consulta}, reportado por régimen (relacional puro, de grafo puro, híbrido) e incluyendo los siguientes indicadores: número de invocaciones al \ac{LLM}, distribución de \emph{tokens} de entrada y salida, número de iteraciones del bucle de refinamiento hasta cumplir el criterio de terminación, latencia agregada de extremo a extremo (P50 y P95) y coste monetario unitario estimado bajo el modelo del proveedor declarado. Este conjunto materializa el requisito R8 (Sección~\ref{sec:prop-requisitos}) y permite contrastar el coste sostenido de la propuesta con el de los \emph{baselines} accesibles bajo condiciones equivalentes. % LLM-like: cliché-LLM:"materializa"
     \item \textbf{Estudios de ablación} que aíslen la contribución de cada componente de la propuesta: el efecto del anclaje al esquema dual, el de la mediación por \ac{RI} respecto a la generación directa, y el de la verificación en cascada respecto a la verificación post-ejecución únicamente.
-    \item \textbf{Análisis comparativo contra \emph{baselines}} representativos de las cuatro líneas identificadas en el Capítulo~\ref{chap:stateoftheart}, restringido a los \emph{baselines} cuyo código y datos sean accesibles bajo las condiciones de reproducibilidad declaradas.
+    \item \textbf{Análisis comparativo contra \emph{baselines}} representativos de las cuatro líneas identificadas en el Capítulo~\ref{chap:stateoftheart} para el régimen relacional, y contra los sistemas \emph{text-to-Cypher} y \emph{text-to-GQL} cubiertos por \textsc{Text2GQL-Bench} para el régimen de grafo, restringido en ambos casos a los \emph{baselines} cuyo código y datos sean accesibles bajo las condiciones de reproducibilidad declaradas.
     \item \textbf{Análisis de errores categorizado} sobre el espacio completo de la taxonomía de alucinaciones introducida en la Sección~\ref{subsec:alucinaciones}, con discusión explícita de las limitaciones de cada categoría de verificación.
 \end{enumerate}
 
@@ -437,7 +448,7 @@ El cronograma sitúa la sustentación final en la semana del 1 al 12 de diciembr
 \begin{enumerate}
     \item Una \emph{caracterización formal de la \ac{RI} IR-SQL/PGQ} ---gramática, sistema de tipos, función de compilación--- que sirva como referencia para trabajos posteriores que extiendan la generación a otros dialectos del estándar de grafos.
     \item \emph{Evidencia empírica} de que la mediación por \ac{RI} tipada con verificación en cascada reduce las alucinaciones referenciales y estructurales en el régimen híbrido respecto a la generación directa, en condiciones controladas.
-    \item Un \emph{procedimiento de construcción de corpus} \ac{SQL}/\ac{PGQ} que cubra los tres regímenes y que pueda reutilizarse en investigaciones posteriores.
+    \item Un \emph{procedimiento de construcción de corpus} \ac{SQL}/\ac{PGQ}, derivado de la metodología de \textsc{Text2GQL-Bench}~\cite{text2gqlbench} y adaptado al estándar híbrido, que cubra el régimen híbrido y que pueda reutilizarse en investigaciones posteriores.
 \end{enumerate}
 
 \paragraph{Documentos y divulgación.} La entrega final incluirá:
@@ -470,9 +481,11 @@ Tres limitaciones se reconocen explícitamente, sin que su presencia invalide lo
 \section{Síntesis y transición}
 \label{sec:prop-sintesis}
 
-Este capítulo describió una arquitectura que articula cuatro componentes ---anclaje al esquema dual, \ac{RI} tipada IR-SQL/PGQ, compilador determinista y bucle de verificación--- bajo un \emph{pipeline} de cinco etapas y cinco principios de diseño. La propuesta responde de forma explícita a los ocho requisitos derivados del planteamiento del problema y se apoya en una base experimental modular que combina elementos reutilizados del estado del arte (\textsc{XiYan-SQL}, \textsc{CHESS}, \textsc{RSL-SQL}, DuckDB+DuckPGQ, \textsc{NL2SQL360}, sqlglot) con código propio cuya contribución central es la \ac{RI} IR-SQL/PGQ, su compilador determinista y el verificador estructurado.
+Este capítulo describió una arquitectura que articula cuatro componentes ---anclaje al esquema dual, \ac{RI} tipada IR-SQL/PGQ, compilador determinista y bucle de verificación--- bajo un \emph{pipeline} de cinco etapas y cinco principios de diseño. La propuesta responde de forma explícita a los ocho requisitos derivados del planteamiento del problema y se apoya en una base experimental modular que combina elementos reutilizados del estado del arte (\textsc{XiYan-SQL}, \textsc{CHESS}, \textsc{RSL-SQL}, DuckDB+DuckPGQ, \textsc{NL2SQL360}, \textsc{Text2GQL-Bench}, sqlglot) con código propio cuya contribución central es la \ac{RI} IR-SQL/PGQ, su compilador determinista y el verificador estructurado. % LLM-like: cliché-LLM:"responde de forma explícita"; cliché-LLM:"articula"
 
 La presentación se hizo bajo dos exigencias metodológicas: la \emph{trazabilidad de la procedencia} ---toda pieza reutilizada se identifica con su origen y la modificación que se le aplica se declara explícitamente--- y la \emph{transparencia experimental} ---los pivotes y aprendizajes operacionales se documentan en lugar de ocultarse. Esta orientación responde al carácter incremental del trabajo y a la recomendación de que la propuesta pueda ser replicada de forma independiente. Los resultados esperados se han enunciado en términos verificables, con plazos derivados del cronograma y con criterios de éxito que admiten validación externa.
+
+\paragraph{Portabilidad y agnosticismo del motor de ejecución.} La arquitectura distingue de forma deliberada entre las piezas agnósticas al motor objetivo y aquellas específicas de la implementación de referencia. La \ac{RI} IR-SQL/PGQ, la separación entre generación estadística y compilación determinista, las cuatro familias de verificación estática y la política de retroalimentación estructurada son agnósticas al motor: dependen únicamente del esquema dual y del estándar ISO/IEC 9075-16:2023. Las restricciones inducidas por DuckPGQ en su versión declarada ---variable explícita en cada arista, etiqueta obligatoria en cada \texttt{VertexPattern}--- se aíslan en banderas de configuración del compilador y del verificador, según se documentó en las Secciones~\ref{subsec:prop-compilador} y~\ref{subsec:prop-verificacion}. La transferencia de la propuesta a otro motor del estándar exige, en consecuencia, la revisión de dichas banderas y la actualización de las versiones declaradas en la Sección~\ref{subsec:prop-stack}, sin reescritura de la lógica del \emph{pipeline}. Esta separación operativa concreta el requisito R7 y es la condición necesaria para que la propuesta pueda aplicarse a entornos empresariales con \acp{RDBMS} heterogéneos sin asumir compromisos arquitectónicos específicos del motor de validación inicial.
 
 El siguiente capítulo describe el diseño experimental que permite validar la propuesta: los \emph{benchmarks} empleados, la construcción del corpus \ac{SQL}/\ac{PGQ} de evaluación, las métricas que complementan a las canónicas y los \emph{baselines} comparativos sobre los que se contrasta el desempeño de la arquitectura.
 
